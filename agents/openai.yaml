@@ -1,0 +1,7 @@
+interface:
+  display_name: "Thamous API v2"
+  short_description: "Requêter Thamous v2 logique via CLI"
+  default_prompt: "Utilise $thamous-api-v2 pour transformer une demande en structure logique, diagnostiquer la trace ou exécuter ask_logic."
+
+policy:
+  allow_implicit_invocation: true
