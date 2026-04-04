@@ -62,7 +62,7 @@ Après installation de la skill, utiliser :
 
 ### Obtenir les accès
 
-- **Token Thamous** : dans Thamous, utiliser le bouton de copie du token API dans le menu d'administration, puis fournir ce token à la skill de l'une des manières suivantes : `THAMOUS_TOKEN`, `THAMOUS_TOKEN_FILE`, ou éventuellement Bitwarden si cette solution est disponible.
+- **Token Thamous** : soit l'obtenir directement par l'API avec `login_token` en fournissant `login` et `mot de passe`, soit le fournir à la skill de l'une des manières suivantes : `THAMOUS_TOKEN`, `THAMOUS_TOKEN_FILE`, ou éventuellement Bitwarden si cette solution est disponible.
 - **Clé API fournisseur** : dans Thamous, ouvrir le menu `LLM`, enregistrer une clé API pour le fournisseur voulu, puis choisir un modèle. Cette clé reste enregistrée dans Thamous pour le compte utilisateur.
 
 ### Important
@@ -96,6 +96,12 @@ Toute demande à l’API doit préciser un **format de sortie demandé** :
 
 - Santé :
   - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py health`
+
+- Obtenir un token Thamous par l'API :
+  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py login-token --login MON_LOGIN --password MON_MOT_DE_PASSE`
+
+- Obtenir et enregistrer le token dans un fichier :
+  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py login-token --login MON_LOGIN --password MON_MOT_DE_PASSE --write-token-file ~/.config/thamous/token`
 
 - Contexte logique :
   - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py logic-context --projet HilbertGG`

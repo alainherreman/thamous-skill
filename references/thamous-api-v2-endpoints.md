@@ -7,6 +7,7 @@
 ## Auth
 
 - `health` : sans auth
+- `login_token` : sans Bearer token, avec `login` + `password`
 - le reste : Bearer token
 
 Le client lit, dans cet ordre :
@@ -33,6 +34,21 @@ Actions actuellement prises en charge :
 Si l’utilisateur demande d’enregistrer une liste sans donner son nom, il faut demander ce nom.
 
 ## Endpoints utiles
+
+### `login_token`
+
+POST JSON.
+
+Entrée :
+- `login`
+- `password`
+
+Retourne :
+- `token`
+- `signature`
+- `login`
+- `nom`
+- `projects`
 
 ### `fiche_url`
 

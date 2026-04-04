@@ -221,6 +221,38 @@ def _emit_output(code: int, data: Any, fmt: str) -> None:
     print(json.dumps(data, ensure_ascii=False, indent=2))
 
 
+def cmd_login_token(args: argparse.Namespace) -> None:
+    payload = {"login": args.login, "password": args.password}
+    code, data = _request(
+        base_url=args.base_url,
+        path="login_token",
+        method="POST",
+        auth=False,
+        timeout_s=args.timeout,
+        verbose=args.verbose,
+        raw=args.raw,
+        response_format="json",
+        payload=payload,
+    )
+    if isinstance(data, dict) and isinstance(data.get("error"), dict):
+        _emit_output(code, data, args.format)
+        raise SystemExit(1)
+
+    token = ""
+    if isinstance(data, dict):
+        token = str(data.get("token", "")).strip()
+
+    if token and args.write_token_file:
+        with open(args.write_token_file, "w", encoding="utf-8") as fh:
+            fh.write(token + "\n")
+
+    if args.token_only and token:
+        print(token)
+        return
+
+    _emit_output(code, data, args.format)
+
+
 def cmd_fiche_url(args: argparse.Namespace) -> None:
     code, data = _request(base_url=args.base_url, path="fiche_url", method="GET", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format, params={"id": args.id, "table": args.table, **({"projet": args.projet} if args.projet else {})})
     if args.response_format == "url" and isinstance(data, dict) and data.get("_raw"):
@@ -301,6 +333,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub = ap.add_subparsers(dest="action", required=True)
     sub.add_parser("health")
+
+    sp = sub.add_parser("login-token")
+    sp.add_argument("--login", required=True)
+    sp.add_argument("--password", required=True)
+    sp.add_argument("--write-token-file")
+    sp.add_argument("--token-only", action="store_true")
 
     sp = sub.add_parser("logic-context")
     sp.add_argument("--projet")
@@ -390,6 +428,9 @@ def main() -> None:
 
     if args.action == "health":
         code, data = _request(base_url=args.base_url, path="health", method="GET", auth=False, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format)
+    elif args.action == "login-token":
+        cmd_login_token(args)
+        return
     elif args.action == "logic-context":
         params = {}
         if args.projet:
