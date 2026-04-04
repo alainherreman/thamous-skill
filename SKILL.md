@@ -35,10 +35,23 @@ Après installation de la skill, utiliser :
 
 - Python 3
 - `requests`
-- un token Thamous pour la prod :
-  - `THAMOUS_TOKEN`
-  - ou `THAMOUS_TOKEN_FILE`
-  - ou Bitwarden, comme dans la skill v1
+- pour utiliser réellement la skill :
+  - un **token Thamous**
+  - une **clé API fournisseur LLM**
+
+### Obtenir les accès
+
+- **Token Thamous** : dans Thamous, utiliser le bouton de copie du token API dans le menu d'administration, puis fournir ce token à la skill de l'une des manières suivantes : `THAMOUS_TOKEN`, `THAMOUS_TOKEN_FILE`, ou éventuellement Bitwarden si cette solution est disponible.
+- **Clé API fournisseur** : dans Thamous, ouvrir le menu `LLM`, enregistrer une clé API pour le fournisseur voulu, puis choisir un modèle. Cette clé reste enregistrée dans Thamous pour le compte utilisateur.
+
+### Important
+
+La skill peut être chargée sans erreur même si ces accès ne sont pas encore configurés, mais elle ne peut pas être utilisée réellement sans :
+
+- un token Thamous ;
+- une clé API fournisseur LLM.
+
+Bitwarden peut être utilisé pour fournir le token Thamous, mais ce n'est qu'une possibilité parmi d'autres.
 
 ## Endpoints utiles
 
