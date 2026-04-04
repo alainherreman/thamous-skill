@@ -107,7 +107,7 @@ Toute demande à l’API doit préciser un **format de sortie demandé** :
   - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py logic-context --projet HilbertGG`
 
 - Texte -> résultats :
-  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py ask-logic --q "Les livres de Klein traduits en anglais" --limit 10`
+  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py ask-logic --q "Les livres de Klein traduits en anglais"`
 
 - Ouvrir une fiche :
   - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py open-fiche --table tbiblio --id 1442`
@@ -124,6 +124,7 @@ Toute demande à l’API doit préciser un **format de sortie demandé** :
 ## Règles d’usage
 
 - Préférer `ask-logic` pour une recherche complète.
+- Les réponses de recherche sont limitées à **100 résultats** côté API ; la skill ne doit pas essayer de modifier cette limite.
 - Préférer `open-fiche` et `open-list` quand l’utilisateur demande explicitement une ouverture.
 - Préférer `save-list` quand l’utilisateur demande explicitement l’enregistrement d’une liste.
 - Si le nom de liste manque, le demander.
