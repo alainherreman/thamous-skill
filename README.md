@@ -13,3 +13,12 @@ Utilisation réelle :
 - nécessite aussi une **clé API fournisseur LLM** ;
 - le token Thamous s'obtient dans Thamous via le bouton de copie du token API, puis peut être fourni par `THAMOUS_TOKEN`, `THAMOUS_TOKEN_FILE` ou éventuellement Bitwarden ;
 - la clé fournisseur s'enregistre dans le menu `LLM`, où l'on choisit aussi le modèle.
+
+Actions explicites actuellement prises en charge :
+- ouvrir une fiche ;
+- ouvrir une liste ;
+- enregistrer une liste en extension ;
+- enregistrer une liste en compréhension ;
+- diagnostiquer une structure ou une réponse.
+
+Si une demande ne correspond pas à l’une de ces actions, la skill doit le dire explicitement au lieu d’improviser.

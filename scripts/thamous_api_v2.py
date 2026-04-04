@@ -64,9 +64,7 @@ def get_token() -> str:
     except Exception:
         pass
 
-    raise SystemExit(
-        "THAMOUS_TOKEN manquant. Exporte THAMOUS_TOKEN=... ou THAMOUS_TOKEN_FILE=... puis réessaie."
-    )
+    raise SystemExit("THAMOUS_TOKEN manquant. Exporte THAMOUS_TOKEN=... ou THAMOUS_TOKEN_FILE=... puis réessaie.")
 
 
 def _as_str(v: Any) -> str:
@@ -78,18 +76,7 @@ def _as_str(v: Any) -> str:
 
 
 def _pick_table_columns(rows: list[dict[str, Any]]) -> list[str]:
-    preferred = [
-        "id",
-        "nom",
-        "titre",
-        "annee",
-        "type",
-        "langue",
-        "editeur",
-        "count",
-        "role",
-        "url",
-    ]
+    preferred = ["id", "nom", "titre", "annee", "type", "langue", "editeur", "count", "role", "url"]
     present = [k for k in preferred if any(k in r and r.get(k) not in (None, "") for r in rows)]
     if present:
         return present[:8]
@@ -118,19 +105,7 @@ def _print_table(rows: list[dict[str, Any]]) -> None:
         print(fmt_line(row))
 
 
-def _request(
-    *,
-    base_url: str,
-    path: str,
-    method: str,
-    auth: bool,
-    timeout_s: int,
-    verbose: bool,
-    raw: bool,
-    response_format: str,
-    params: dict[str, Any] | None = None,
-    payload: dict[str, Any] | None = None,
-) -> tuple[int, Any]:
+def _request(*, base_url: str, path: str, method: str, auth: bool, timeout_s: int, verbose: bool, raw: bool, response_format: str, params: dict[str, Any] | None = None, payload: dict[str, Any] | None = None) -> tuple[int, Any]:
     headers: dict[str, str] = {}
     token = ""
     if auth:
@@ -192,6 +167,7 @@ def _load_json_from_args(payload_file: str | None, payload_json: str | None) -> 
         raise SystemExit("Le payload JSON doit être un objet.")
     return data
 
+
 def _maybe_set(payload: dict[str, Any], key: str, value: Any) -> None:
     if value is not None and value != "":
         payload[key] = value
@@ -222,7 +198,6 @@ def _emit_output(code: int, data: Any, fmt: str) -> None:
     if fmt == "json":
         print(json.dumps(data, ensure_ascii=False, indent=2))
         return
-
     if fmt == "jsonl":
         if isinstance(data, dict) and isinstance(data.get("results"), list):
             for row in data["results"]:
@@ -230,7 +205,6 @@ def _emit_output(code: int, data: Any, fmt: str) -> None:
             return
         print(json.dumps(data, ensure_ascii=False))
         return
-
     if isinstance(data, dict):
         if isinstance(data.get("results"), list):
             if "total" in data:
@@ -244,24 +218,11 @@ def _emit_output(code: int, data: Any, fmt: str) -> None:
             for item in data["types_biblio"]:
                 print(item)
             return
-
     print(json.dumps(data, ensure_ascii=False, indent=2))
 
 
-
-
 def cmd_fiche_url(args: argparse.Namespace) -> None:
-    code, data = _request(
-        base_url=args.base_url,
-        path="fiche_url",
-        method="GET",
-        auth=True,
-        timeout_s=args.timeout,
-        verbose=args.verbose,
-        raw=args.raw,
-        response_format=args.response_format,
-        params={"id": args.id, "table": args.table, **({"projet": args.projet} if args.projet else {})},
-    )
+    code, data = _request(base_url=args.base_url, path="fiche_url", method="GET", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format, params={"id": args.id, "table": args.table, **({"projet": args.projet} if args.projet else {})})
     if args.response_format == "url" and isinstance(data, dict) and data.get("_raw"):
         print(str(data.get("_raw", "")).strip())
         return
@@ -269,17 +230,7 @@ def cmd_fiche_url(args: argparse.Namespace) -> None:
 
 
 def cmd_open_fiche(args: argparse.Namespace) -> None:
-    code, data = _request(
-        base_url=args.base_url,
-        path="fiche_url",
-        method="GET",
-        auth=True,
-        timeout_s=args.timeout,
-        verbose=args.verbose,
-        raw=False,
-        response_format="url",
-        params={"id": args.id, "table": args.table, **({"projet": args.projet} if args.projet else {})},
-    )
+    code, data = _request(base_url=args.base_url, path="fiche_url", method="GET", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=False, response_format="url", params={"id": args.id, "table": args.table, **({"projet": args.projet} if args.projet else {})})
     url = ""
     if isinstance(data, dict):
         if data.get("form_url"):
@@ -300,20 +251,10 @@ def cmd_open_fiche(args: argparse.Namespace) -> None:
 
 
 def cmd_open_list(args: argparse.Namespace) -> None:
-    code, data = _request(
-        base_url=args.base_url,
-        path="ask_logic",
-        method="POST",
-        auth=True,
-        timeout_s=args.timeout,
-        verbose=args.verbose,
-        raw=False,
-        response_format="url",
-        payload=_base_payload_from_args(args),
-    )
+    code, data = _request(base_url=args.base_url, path="ask_logic", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=False, response_format="url", payload=_base_payload_from_args(args))
     url = ""
     if isinstance(data, dict) and data.get("_raw"):
-        url = str(data["_raw"]).strip()
+        url = str(data.get("_raw", "")).strip()
     elif isinstance(data, str):
         url = data.strip()
     if not url:
@@ -328,19 +269,31 @@ def cmd_open_list(args: argparse.Namespace) -> None:
     else:
         print(url)
 
+
+def cmd_save_list(args: argparse.Namespace) -> None:
+    payload = _base_payload_from_args(args)
+    payload["nom_liste"] = args.nom_liste
+    payload["save_mode"] = args.save_mode
+    code, data = _request(base_url=args.base_url, path="save_logic", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=False, response_format=args.response_format, payload=payload)
+    if args.response_format == "url" and isinstance(data, dict) and data.get("_raw"):
+        url = str(data.get("_raw", "")).strip()
+        if args.print_only:
+            print(url)
+            return
+        subprocess.check_call(["xdg-open", url])
+        if args.format == "json":
+            print(json.dumps({"url": url}, ensure_ascii=False, indent=2))
+        else:
+            print(url)
+        return
+    _emit_output(code, data, args.format)
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser()
-    ap.add_argument(
-        "--base-url",
-        default=os.environ.get("THAMOUS_V2_BASE_URL", DEFAULT_BASE_URL),
-        help="URL de base de l’API v2 (ou THAMOUS_V2_BASE_URL).",
-    )
+    ap.add_argument("--base-url", default=os.environ.get("THAMOUS_V2_BASE_URL", DEFAULT_BASE_URL), help="URL de base de l’API v2 (ou THAMOUS_V2_BASE_URL).")
     ap.add_argument("--timeout", type=int, default=45, help="Timeout HTTP en secondes.")
-    ap.add_argument(
-        "--token-file",
-        default=os.environ.get("THAMOUS_TOKEN_FILE"),
-        help="Chemin d’un fichier contenant le token (ou THAMOUS_TOKEN_FILE).",
-    )
+    ap.add_argument("--token-file", default=os.environ.get("THAMOUS_TOKEN_FILE"), help="Chemin d’un fichier contenant le token (ou THAMOUS_TOKEN_FILE).")
     ap.add_argument("--raw", action="store_true", help="Affiche la réponse brute.")
     ap.add_argument("--verbose", action="store_true", help="Logs HTTP sur stderr.")
     ap.add_argument("--response-format", default="json", choices=["json", "url"], help="Format demandé à l’API.")
@@ -381,6 +334,26 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--derive-limit", type=int, dest="derive_limit")
     sp.add_argument("--print-only", action="store_true", help="Retourner l'URL sans lancer le navigateur.")
 
+    sp = sub.add_parser("save-list")
+    sp.add_argument("--q", required=True)
+    sp.add_argument("--nom-liste", required=True)
+    sp.add_argument("--save-mode", default="extension", choices=["extension", "comprehension"])
+    sp.add_argument("--project")
+    sp.add_argument("--provider")
+    sp.add_argument("--model")
+    sp.add_argument("--trace", action="store_true")
+    sp.add_argument("--indication")
+    sp.add_argument("--feedback")
+    sp.add_argument("--reformulation-precedente")
+    sp.add_argument("--limit", type=int)
+    sp.add_argument("--offset", type=int)
+    sp.add_argument("--order1")
+    sp.add_argument("--order2")
+    sp.add_argument("--asc-desc1", dest="asc_desc1")
+    sp.add_argument("--asc-desc2", dest="asc_desc2")
+    sp.add_argument("--derive-limit", type=int, dest="derive_limit")
+    sp.add_argument("--print-only", action="store_true", help="Retourner l'URL sans lancer le navigateur quand --response-format=url.")
+
     for name in ["text-to-structure", "ask-logic"]:
         sp = sub.add_parser(name)
         sp.add_argument("--q", required=True)
@@ -416,55 +389,16 @@ def main() -> None:
         os.environ["THAMOUS_TOKEN_FILE"] = args.token_file
 
     if args.action == "health":
-        code, data = _request(
-            base_url=args.base_url,
-            path="health",
-            method="GET",
-            auth=False,
-            timeout_s=args.timeout,
-            verbose=args.verbose,
-            raw=args.raw,
-            response_format=args.response_format,
-        )
+        code, data = _request(base_url=args.base_url, path="health", method="GET", auth=False, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format)
     elif args.action == "logic-context":
         params = {}
         if args.projet:
             params["projet"] = args.projet
-        code, data = _request(
-            base_url=args.base_url,
-            path="logic_context",
-            method="GET",
-            auth=True,
-            timeout_s=args.timeout,
-            verbose=args.verbose,
-            raw=args.raw,
-            response_format=args.response_format,
-            params=params,
-        )
+        code, data = _request(base_url=args.base_url, path="logic_context", method="GET", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format, params=params)
     elif args.action == "text-to-structure":
-        code, data = _request(
-            base_url=args.base_url,
-            path="text_to_structure",
-            method="POST",
-            auth=True,
-            timeout_s=args.timeout,
-            verbose=args.verbose,
-            raw=args.raw,
-            response_format=args.response_format,
-            payload=_base_payload_from_args(args),
-        )
+        code, data = _request(base_url=args.base_url, path="text_to_structure", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format, payload=_base_payload_from_args(args))
     elif args.action == "ask-logic":
-        code, data = _request(
-            base_url=args.base_url,
-            path="ask_logic",
-            method="POST",
-            auth=True,
-            timeout_s=args.timeout,
-            verbose=args.verbose,
-            raw=args.raw,
-            response_format=args.response_format,
-            payload=_base_payload_from_args(args),
-        )
+        code, data = _request(base_url=args.base_url, path="ask_logic", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format, payload=_base_payload_from_args(args))
     elif args.action == "fiche-url":
         cmd_fiche_url(args)
         return
@@ -474,42 +408,15 @@ def main() -> None:
     elif args.action == "open-list":
         cmd_open_list(args)
         return
+    elif args.action == "save-list":
+        cmd_save_list(args)
+        return
     elif args.action == "compile-logic":
-        code, data = _request(
-            base_url=args.base_url,
-            path="compile_logic",
-            method="POST",
-            auth=True,
-            timeout_s=args.timeout,
-            verbose=args.verbose,
-            raw=args.raw,
-            response_format=args.response_format,
-            payload=_load_json_from_args(args.payload_file, args.payload_json),
-        )
+        code, data = _request(base_url=args.base_url, path="compile_logic", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format, payload=_load_json_from_args(args.payload_file, args.payload_json))
     elif args.action == "search-logic":
-        code, data = _request(
-            base_url=args.base_url,
-            path="search_logic",
-            method="POST",
-            auth=True,
-            timeout_s=args.timeout,
-            verbose=args.verbose,
-            raw=args.raw,
-            response_format=args.response_format,
-            payload=_load_json_from_args(args.payload_file, args.payload_json),
-        )
+        code, data = _request(base_url=args.base_url, path="search_logic", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format, payload=_load_json_from_args(args.payload_file, args.payload_json))
     elif args.action == "replay-logic":
-        code, data = _request(
-            base_url=args.base_url,
-            path="replay_logic",
-            method="POST",
-            auth=True,
-            timeout_s=args.timeout,
-            verbose=args.verbose,
-            raw=args.raw,
-            response_format=args.response_format,
-            payload=_load_json_from_args(args.payload_file, args.payload_json),
-        )
+        code, data = _request(base_url=args.base_url, path="replay_logic", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format, payload=_load_json_from_args(args.payload_file, args.payload_json))
     else:
         raise SystemExit(f"Action inconnue: {args.action}")
 
