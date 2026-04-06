@@ -35,6 +35,9 @@ Actions actuellement prises en charge :
 
 Si l’utilisateur demande d’enregistrer une liste sans donner son nom, il faut demander ce nom.
 
+Pour les mutations de mots-clefs/remarques de projet, l’utilisateur doit être administrateur du projet.
+Pour les mutations sur une référence, le mot-clef ou la remarque doit appartenir au projet.
+
 ## Endpoints utiles
 
 ### `login_token`
@@ -137,3 +140,69 @@ Retourne :
 - `value` (liste d’ids)
 - `total`
 - `meta`
+
+
+### `keywords_ref`
+
+POST JSON.
+
+Entrée :
+- `project`
+- `table`
+- `id`
+- `action` : `add` ou `remove`
+- `mot_clef`
+- `publicite` facultative
+
+Contrôles :
+- utilisateur administrateur du projet ;
+- le mot-clef doit appartenir à la liste du projet.
+
+Retour :
+- `mots_clefs` mis à jour ;
+- `suggestions` si le mot-clef demandé n'existe pas dans le projet.
+
+### `keywords_project`
+
+POST JSON.
+
+Entrée :
+- `project`
+- `action` : `add` ou `remove`
+- `mot_clef`
+- `definition` facultative
+
+Contrôles :
+- utilisateur administrateur du projet.
+
+### `remarks_ref`
+
+POST JSON.
+
+Entrée :
+- `project`
+- `table`
+- `id`
+- `action` : `add` ou `remove`
+- `remarque`
+- `publicite` facultative
+
+Contrôles :
+- utilisateur administrateur du projet ;
+- la remarque doit appartenir à la liste du projet.
+
+Retour :
+- `remarques` mises à jour ;
+- `suggestions` si la remarque demandée n'existe pas dans le projet.
+
+### `remarks_project`
+
+POST JSON.
+
+Entrée :
+- `project`
+- `action` : `add` ou `remove`
+- `remarque`
+
+Contrôles :
+- utilisateur administrateur du projet.

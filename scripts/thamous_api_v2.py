@@ -563,6 +563,65 @@ def cmd_follow_links(args: argparse.Namespace) -> None:
     _emit_output(code, data, args.format)
 
 
+def cmd_keywords_ref(args: argparse.Namespace) -> None:
+    payload = {
+        "project": args.project,
+        "table": args.table,
+        "id": args.id,
+        "action": args.action_name,
+        "mot_clef": args.mot_clef,
+        "publicite": args.publicite,
+    }
+    code, data = _request(base_url=args.base_url, path="keywords_ref", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format="json", payload=payload)
+    if isinstance(data, dict) and isinstance(data.get("error"), dict):
+        _emit_output(code, data, args.format)
+        raise SystemExit(1)
+    _emit_output(code, data, args.format)
+
+
+def cmd_keywords_project(args: argparse.Namespace) -> None:
+    payload = {
+        "project": args.project,
+        "action": args.action_name,
+        "mot_clef": args.mot_clef,
+        "definition": args.definition,
+    }
+    code, data = _request(base_url=args.base_url, path="keywords_project", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format="json", payload=payload)
+    if isinstance(data, dict) and isinstance(data.get("error"), dict):
+        _emit_output(code, data, args.format)
+        raise SystemExit(1)
+    _emit_output(code, data, args.format)
+
+
+def cmd_remarks_ref(args: argparse.Namespace) -> None:
+    payload = {
+        "project": args.project,
+        "table": args.table,
+        "id": args.id,
+        "action": args.action_name,
+        "remarque": args.remarque,
+        "publicite": args.publicite,
+    }
+    code, data = _request(base_url=args.base_url, path="remarks_ref", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format="json", payload=payload)
+    if isinstance(data, dict) and isinstance(data.get("error"), dict):
+        _emit_output(code, data, args.format)
+        raise SystemExit(1)
+    _emit_output(code, data, args.format)
+
+
+def cmd_remarks_project(args: argparse.Namespace) -> None:
+    payload = {
+        "project": args.project,
+        "action": args.action_name,
+        "remarque": args.remarque,
+    }
+    code, data = _request(base_url=args.base_url, path="remarks_project", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format="json", payload=payload)
+    if isinstance(data, dict) and isinstance(data.get("error"), dict):
+        _emit_output(code, data, args.format)
+        raise SystemExit(1)
+    _emit_output(code, data, args.format)
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base-url", default=os.environ.get("THAMOUS_V2_BASE_URL", DEFAULT_BASE_URL), help="URL de base de l’API v2 (ou THAMOUS_V2_BASE_URL).")
@@ -655,6 +714,33 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--result-name", dest="result_name")
     sp.add_argument("--project")
 
+    sp = sub.add_parser("keywords-ref")
+    sp.add_argument("--id", required=True, type=int)
+    sp.add_argument("--table", required=True)
+    sp.add_argument("--project", required=True)
+    sp.add_argument("--action", dest="action_name", required=True, choices=["add", "remove"])
+    sp.add_argument("--mot-clef", dest="mot_clef", required=True)
+    sp.add_argument("--publicite", default="public")
+
+    sp = sub.add_parser("keywords-project")
+    sp.add_argument("--project", required=True)
+    sp.add_argument("--action", dest="action_name", required=True, choices=["add", "remove"])
+    sp.add_argument("--mot-clef", dest="mot_clef", required=True)
+    sp.add_argument("--definition")
+
+    sp = sub.add_parser("remarks-ref")
+    sp.add_argument("--id", required=True, type=int)
+    sp.add_argument("--table", required=True)
+    sp.add_argument("--project", required=True)
+    sp.add_argument("--action", dest="action_name", required=True, choices=["add", "remove"])
+    sp.add_argument("--remarque", required=True)
+    sp.add_argument("--publicite", default="public")
+
+    sp = sub.add_parser("remarks-project")
+    sp.add_argument("--project", required=True)
+    sp.add_argument("--action", dest="action_name", required=True, choices=["add", "remove"])
+    sp.add_argument("--remarque", required=True)
+
     for name in ["text-to-structure", "ask-logic"]:
         sp = sub.add_parser(name)
         sp.add_argument("--q", required=True)
@@ -724,6 +810,18 @@ def main() -> None:
         return
     elif args.action == "follow-links":
         cmd_follow_links(args)
+        return
+    elif args.action == "keywords-ref":
+        cmd_keywords_ref(args)
+        return
+    elif args.action == "keywords-project":
+        cmd_keywords_project(args)
+        return
+    elif args.action == "remarks-ref":
+        cmd_remarks_ref(args)
+        return
+    elif args.action == "remarks-project":
+        cmd_remarks_project(args)
         return
     elif args.action == "compile-logic":
         code, data = _request(base_url=args.base_url, path="compile_logic", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format, payload=_load_json_from_args(args.payload_file, args.payload_json))

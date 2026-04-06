@@ -40,6 +40,9 @@ Actions actuellement prises en charge :
   - à partir d’une nouvelle demande.
 - **suivre un type de lien**
   - à partir d’une liste locale existante.
+- **modifier les mots-clefs et remarques**
+  - sur une référence ;
+  - sur la liste de projet.
 
 Action distincte, à ne pas confondre avec l’enregistrement d’une liste :
 
@@ -130,6 +133,10 @@ Bitwarden peut être utilisé pour fournir le token Thamous, mais ce n'est qu'un
 - `save_logic`
 - `fiche_url`
 - `follow_links`
+- `keywords_ref`
+- `keywords_project`
+- `remarks_ref`
+- `remarks_project`
 
 ## Détermination de la sortie
 
