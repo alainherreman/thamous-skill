@@ -29,6 +29,8 @@ Actions actuellement prises en charge :
 - ouvrir une liste ;
 - enregistrer une liste en extension ;
 - enregistrer une liste en compréhension ;
+- ajouter à une liste précédente ;
+- suivre un type de lien depuis une liste précédente ;
 - diagnostiquer une structure ou une réponse.
 
 Si l’utilisateur demande d’enregistrer une liste sans donner son nom, il faut demander ce nom.
@@ -116,3 +118,22 @@ Retourne :
 
 Règle :
 - `save_mode=comprehension` n’est pris en charge que pour `mode=search`.
+
+### `follow_links`
+
+POST JSON.
+
+Entrée :
+- `project`
+- `input_table`
+- `input_ids`
+- `link_type`
+- `from` : `source` ou `but`
+- `to` : `source` ou `but`
+- `output_table`
+
+Retourne :
+- `type`
+- `value` (liste d’ids)
+- `total`
+- `meta`

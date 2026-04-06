@@ -7,6 +7,7 @@ import argparse
 import datetime as _dt
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -16,11 +17,145 @@ import requests
 
 DEFAULT_BASE_URL = "https://thamous.ouvaton.org/thamous/php/api/v2/index.php"
 DEFAULT_BW_ITEM_NAME = "Al1 - Thamous API Token"
+DEFAULT_HISTORY_FILE = os.path.expanduser("~/.config/thamous/history_v2.json")
 
 
 def _read_text_file(path: str) -> str:
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
+
+
+def _history_file() -> str:
+    return os.environ.get("THAMOUS_HISTORY_FILE", DEFAULT_HISTORY_FILE)
+
+
+def _ensure_parent_dir(path: str) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+
+def _load_history() -> list[dict[str, Any]]:
+    path = _history_file()
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        if isinstance(data, list):
+            return [x for x in data if isinstance(x, dict)]
+    except Exception:
+        pass
+    return []
+
+
+def _save_history(entries: list[dict[str, Any]]) -> None:
+    path = _history_file()
+    _ensure_parent_dir(path)
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(entries[-200:], fh, ensure_ascii=False, indent=2)
+
+
+def _slug(text: str) -> str:
+    text = text.strip().lower()
+    text = re.sub(r"[^\w\s-]", " ", text, flags=re.UNICODE)
+    text = re.sub(r"[\s_-]+", "_", text, flags=re.UNICODE).strip("_")
+    return text or "resultat"
+
+
+def _infer_result_type(data: Any) -> tuple[str, list[Any]]:
+    if not isinstance(data, dict):
+        return "", []
+    results = data.get("results")
+    if not isinstance(results, list):
+        return "", []
+    if results == []:
+        table = ""
+        if isinstance(data.get("compiled"), dict):
+            table = str(data["compiled"].get("table") or "").strip()
+        return (table or "", [])
+    first = results[0]
+    if isinstance(first, dict):
+        if "remarques" in first:
+            vals = [str(r.get("remarques", "")) for r in results if isinstance(r, dict)]
+            return "remarques", vals
+        if "mot_clef" in first or "mots_clefs" in first:
+            vals = []
+            for r in results:
+                if not isinstance(r, dict):
+                    continue
+                if "mot_clef" in r:
+                    vals.append(str(r.get("mot_clef", "")))
+                elif "mots_clefs" in r:
+                    vals.append(str(r.get("mots_clefs", "")))
+            return "mots_clefs", vals
+        table = ""
+        if isinstance(data.get("compiled"), dict):
+            table = str(data["compiled"].get("table") or "").strip()
+        if not table and all(isinstance(r, dict) and "support" in r for r in results):
+            table = "tremarques"
+        ids = [r.get("id") for r in results if isinstance(r, dict) and r.get("id") not in (None, "")]
+        if table and ids:
+            return table, ids
+    return "", []
+
+
+def _store_named_result(name: str, question: str, data: Any) -> dict[str, Any] | None:
+    result_type, values = _infer_result_type(data)
+    if result_type == "":
+        return None
+    entry = {
+        "name": name,
+        "type": result_type,
+        "value": values,
+        "question": question,
+        "reformulation": data.get("structure_response", {}).get("reformulation", "") if isinstance(data, dict) else "",
+        "created_at": _dt.datetime.now().isoformat(timespec="seconds"),
+    }
+    history = [e for e in _load_history() if e.get("name") != name]
+    history.append(entry)
+    _save_history(history)
+    return entry
+
+
+def _find_history_entry(name: str | None = None, previous: bool = False) -> dict[str, Any] | None:
+    history = _load_history()
+    if not history:
+        return None
+    if previous or not name:
+        for entry in reversed(history):
+            t = str(entry.get("type", "")).strip()
+            if t not in ("", "mots_clefs", "remarques"):
+                return entry
+        return None
+    for entry in reversed(history):
+        if str(entry.get("name", "")).strip() == name:
+            return entry
+    return None
+
+
+def _dedupe_keep_order(values: list[Any]) -> list[Any]:
+    out: list[Any] = []
+    seen: set[str] = set()
+    for v in values:
+        key = json.dumps(v, ensure_ascii=False, sort_keys=True) if isinstance(v, (dict, list)) else str(v)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(v)
+    return out
+
+
+def _store_raw_entry(entry: dict[str, Any]) -> dict[str, Any]:
+    history = [e for e in _load_history() if e.get("name") != entry.get("name")]
+    history.append(entry)
+    _save_history(history)
+    return entry
+
+
+def _auto_result_name(question: str, data: Any) -> str:
+    base = _slug(question)[:60]
+    if not base:
+        base = "resultat"
+    result_type, _ = _infer_result_type(data)
+    suffix = result_type or "liste"
+    return f"{base}__{suffix}"
 
 
 def get_token() -> str:
@@ -76,7 +211,7 @@ def _as_str(v: Any) -> str:
 
 
 def _pick_table_columns(rows: list[dict[str, Any]]) -> list[str]:
-    preferred = ["id", "nom", "titre", "annee", "type", "langue", "editeur", "count", "role", "url"]
+    preferred = ["name", "type", "question", "created_at", "id", "nom", "titre", "annee", "langue", "editeur", "count", "role", "url"]
     present = [k for k in preferred if any(k in r and r.get(k) not in (None, "") for r in rows)]
     if present:
         return present[:8]
@@ -220,6 +355,21 @@ def _emit_output(code: int, data: Any, fmt: str) -> None:
     print(json.dumps(data, ensure_ascii=False, indent=2))
 
 
+def _maybe_store_history(args: argparse.Namespace, data: Any) -> None:
+    if not isinstance(data, dict) or getattr(args, "no_history", False):
+        return
+    question = str(getattr(args, "q", "") or "").strip()
+    if question == "":
+        return
+    chosen_name = str(getattr(args, "result_name", "") or "").strip()
+    if chosen_name == "":
+        chosen_name = _auto_result_name(question, data)
+    entry = _store_named_result(chosen_name, question, data)
+    if entry is not None:
+        print(f"\n[result_name] {entry['name']}", file=sys.stderr)
+        print(f"[result_type] {entry['type']}", file=sys.stderr)
+
+
 def cmd_login_token(args: argparse.Namespace) -> None:
     payload = {"login": args.login, "password": args.password}
     code, data = _request(
@@ -320,6 +470,99 @@ def cmd_save_list(args: argparse.Namespace) -> None:
     _emit_output(code, data, args.format)
 
 
+def cmd_add_to_list(args: argparse.Namespace) -> None:
+    base_entry = _find_history_entry(args.base_name, previous=args.previous)
+    if base_entry is None:
+        raise SystemExit("Résultat précédent introuvable.")
+
+    code, data = _request(
+        base_url=args.base_url,
+        path="ask_logic",
+        method="POST",
+        auth=True,
+        timeout_s=args.timeout,
+        verbose=args.verbose,
+        raw=args.raw,
+        response_format="json",
+        payload=_base_payload_from_args(args),
+    )
+    if isinstance(data, dict) and isinstance(data.get("error"), dict):
+        _emit_output(code, data, args.format)
+        raise SystemExit(1)
+
+    new_type, new_values = _infer_result_type(data)
+    base_type = str(base_entry.get("type", "")).strip()
+    base_values = list(base_entry.get("value") or [])
+
+    if not new_type or new_type != base_type:
+        raise SystemExit("Le type du nouveau résultat ne correspond pas à celui de la liste de base.")
+
+    merged_values = _dedupe_keep_order(base_values + new_values)
+    result_name = str(args.result_name or "").strip() or str(base_entry.get("name", "")).strip() or "liste"
+    entry = {
+        "name": result_name,
+        "type": base_type,
+        "value": merged_values,
+        "question": str(base_entry.get("question", "")).strip() or f"Liste mise à jour : {result_name}",
+        "reformulation": "",
+        "created_at": _dt.datetime.now().isoformat(timespec="seconds"),
+    }
+    _store_raw_entry(entry)
+    _emit_output(0, {"ok": True, "name": result_name, "type": base_type, "total": len(merged_values), "updated": True, "added_question": args.q}, args.format)
+
+
+def cmd_follow_links(args: argparse.Namespace) -> None:
+    base_entry = _find_history_entry(args.base_name, previous=args.previous)
+    if base_entry is None:
+        raise SystemExit("Résultat précédent introuvable.")
+
+    input_table = str(base_entry.get("type", "")).strip()
+    input_ids = list(base_entry.get("value") or [])
+    if input_table in ("", "mots_clefs", "remarques"):
+        raise SystemExit("Le résultat précédent n'est pas une liste d'entrées Thamous.")
+
+    payload = {
+        "project": getattr(args, "project", None) or getattr(args, "projet", None),
+        "input_table": input_table,
+        "input_ids": input_ids,
+        "link_type": args.link_type,
+        "from": args.from_side,
+        "to": args.to_side,
+        "output_table": args.output_table,
+    }
+
+    code, data = _request(
+        base_url=args.base_url,
+        path="follow_links",
+        method="POST",
+        auth=True,
+        timeout_s=args.timeout,
+        verbose=args.verbose,
+        raw=args.raw,
+        response_format="json",
+        payload=payload,
+    )
+    if isinstance(data, dict) and isinstance(data.get("error"), dict):
+        _emit_output(code, data, args.format)
+        raise SystemExit(1)
+
+    if isinstance(data, dict):
+        result_name = str(args.result_name or "").strip() or str(base_entry.get("name", "")).strip() or "liste"
+        entry = {
+            "name": result_name,
+            "type": str(data.get("type", "")).strip(),
+            "value": list(data.get("value") or []),
+            "question": f"{args.link_type} depuis {base_entry.get('name','liste précédente')}",
+            "reformulation": "",
+            "created_at": _dt.datetime.now().isoformat(timespec="seconds"),
+        }
+        _store_raw_entry(entry)
+        data = dict(data)
+        data["name"] = result_name
+        data["updated"] = True
+    _emit_output(code, data, args.format)
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base-url", default=os.environ.get("THAMOUS_V2_BASE_URL", DEFAULT_BASE_URL), help="URL de base de l’API v2 (ou THAMOUS_V2_BASE_URL).")
@@ -389,6 +632,29 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--derive-limit", type=int, dest="derive_limit")
     sp.add_argument("--print-only", action="store_true", help="Retourner l'URL sans lancer le navigateur quand --response-format=url.")
 
+    sp = sub.add_parser("add-to-list")
+    sp.add_argument("--q", required=True)
+    sp.add_argument("--base-name")
+    sp.add_argument("--previous", action="store_true")
+    sp.add_argument("--result-name", dest="result_name")
+    sp.add_argument("--project")
+    sp.add_argument("--provider")
+    sp.add_argument("--model")
+    sp.add_argument("--trace", action="store_true")
+    sp.add_argument("--indication")
+    sp.add_argument("--feedback")
+    sp.add_argument("--reformulation-precedente")
+
+    sp = sub.add_parser("follow-links")
+    sp.add_argument("--link-type", required=True)
+    sp.add_argument("--from", dest="from_side", required=True, choices=["source", "but"])
+    sp.add_argument("--to", dest="to_side", required=True, choices=["source", "but"])
+    sp.add_argument("--output-table", required=True)
+    sp.add_argument("--base-name")
+    sp.add_argument("--previous", action="store_true")
+    sp.add_argument("--result-name", dest="result_name")
+    sp.add_argument("--project")
+
     for name in ["text-to-structure", "ask-logic"]:
         sp = sub.add_parser(name)
         sp.add_argument("--q", required=True)
@@ -399,6 +665,8 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--indication")
         sp.add_argument("--feedback")
         sp.add_argument("--reformulation-precedente")
+        sp.add_argument("--result-name", dest="result_name")
+        sp.add_argument("--no-history", action="store_true")
         if name == "ask-logic":
             sp.add_argument("--offset", type=int)
             sp.add_argument("--order1")
@@ -411,6 +679,8 @@ def build_parser() -> argparse.ArgumentParser:
         sp = sub.add_parser(name)
         sp.add_argument("--payload-file")
         sp.add_argument("--payload-json")
+
+    sub.add_parser("history")
 
     return ap
 
@@ -436,6 +706,7 @@ def main() -> None:
         code, data = _request(base_url=args.base_url, path="text_to_structure", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format, payload=_base_payload_from_args(args))
     elif args.action == "ask-logic":
         code, data = _request(base_url=args.base_url, path="ask_logic", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format, payload=_base_payload_from_args(args))
+        _maybe_store_history(args, data)
     elif args.action == "fiche-url":
         cmd_fiche_url(args)
         return
@@ -448,10 +719,19 @@ def main() -> None:
     elif args.action == "save-list":
         cmd_save_list(args)
         return
+    elif args.action == "add-to-list":
+        cmd_add_to_list(args)
+        return
+    elif args.action == "follow-links":
+        cmd_follow_links(args)
+        return
     elif args.action == "compile-logic":
         code, data = _request(base_url=args.base_url, path="compile_logic", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format, payload=_load_json_from_args(args.payload_file, args.payload_json))
     elif args.action == "search-logic":
         code, data = _request(base_url=args.base_url, path="search_logic", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format, payload=_load_json_from_args(args.payload_file, args.payload_json))
+    elif args.action == "history":
+        _emit_output(0, {"results": _load_history(), "total": len(_load_history())}, args.format)
+        return
     elif args.action == "replay-logic":
         code, data = _request(base_url=args.base_url, path="replay_logic", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format, payload=_load_json_from_args(args.payload_file, args.payload_json))
     else:
