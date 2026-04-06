@@ -152,7 +152,7 @@ Entrée :
 - `id`
 - `action` : `add` ou `remove`
 - `mot_clef`
-- `publicite` facultative
+- `publicite` facultative ; si absente, l’API choisit la couche pertinente et, pour une suppression, retire toutes les occurrences
 
 Contrôles :
 - utilisateur administrateur du projet ;
@@ -187,7 +187,7 @@ Entrée :
 - `id`
 - `action` : `add` ou `remove`
 - `remarque`
-- `publicite` facultative
+- `publicite` facultative ; si absente, l’API choisit la couche pertinente et, pour une suppression, retire toutes les occurrences
 
 Contrôles :
 - utilisateur administrateur du projet ;

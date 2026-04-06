@@ -42,6 +42,7 @@ Actions actuellement prises en charge :
   - à partir d’une liste locale existante.
 - **modifier les mots-clefs et remarques**
   - sur une référence ;
+  - sans `publicite`, la mutation agit sur l'état existant de la référence et, pour une suppression, retire toutes les occurrences du projet ;
   - sur la liste de projet ;
   - avec avertissement si le mot-clef ou la remarque est encore utilisé sur des références, puis possibilité de forcer la suppression.
 

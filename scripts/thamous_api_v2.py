@@ -570,8 +570,9 @@ def cmd_keywords_ref(args: argparse.Namespace) -> None:
         "id": args.id,
         "action": args.action_name,
         "mot_clef": args.mot_clef,
-        "publicite": args.publicite,
     }
+    if args.publicite:
+        payload["publicite"] = args.publicite
     code, data = _request(base_url=args.base_url, path="keywords_ref", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format="json", payload=payload)
     if isinstance(data, dict) and isinstance(data.get("error"), dict):
         _emit_output(code, data, args.format)
@@ -602,8 +603,9 @@ def cmd_remarks_ref(args: argparse.Namespace) -> None:
         "id": args.id,
         "action": args.action_name,
         "remarque": args.remarque,
-        "publicite": args.publicite,
     }
+    if args.publicite:
+        payload["publicite"] = args.publicite
     code, data = _request(base_url=args.base_url, path="remarks_ref", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format="json", payload=payload)
     if isinstance(data, dict) and isinstance(data.get("error"), dict):
         _emit_output(code, data, args.format)
@@ -724,7 +726,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--project", required=True)
     sp.add_argument("--action", dest="action_name", required=True, choices=["add", "remove"])
     sp.add_argument("--mot-clef", dest="mot_clef", required=True)
-    sp.add_argument("--publicite", default="public")
+    sp.add_argument("--publicite")
 
     sp = sub.add_parser("keywords-project")
     sp.add_argument("--project", required=True)
@@ -739,7 +741,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--project", required=True)
     sp.add_argument("--action", dest="action_name", required=True, choices=["add", "remove"])
     sp.add_argument("--remarque", required=True)
-    sp.add_argument("--publicite", default="public")
+    sp.add_argument("--publicite")
 
     sp = sub.add_parser("remarks-project")
     sp.add_argument("--project", required=True)
