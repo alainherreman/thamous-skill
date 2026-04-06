@@ -42,7 +42,8 @@ Actions actuellement prises en charge :
   - à partir d’une liste locale existante.
 - **modifier les mots-clefs et remarques**
   - sur une référence ;
-  - sur la liste de projet.
+  - sur la liste de projet ;
+  - avec blocage de suppression si le mot-clef ou la remarque est encore utilisé sur des références.
 
 Action distincte, à ne pas confondre avec l’enregistrement d’une liste :
 

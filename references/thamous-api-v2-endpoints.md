@@ -173,7 +173,8 @@ Entrée :
 - `definition` facultative
 
 Contrôles :
-- utilisateur administrateur du projet.
+- utilisateur administrateur du projet ;
+- suppression refusée si le mot-clef est encore utilisé sur des références du projet.
 
 ### `remarks_ref`
 
@@ -205,4 +206,5 @@ Entrée :
 - `remarque`
 
 Contrôles :
-- utilisateur administrateur du projet.
+- utilisateur administrateur du projet ;
+- suppression refusée si la remarque est encore utilisée sur des références du projet.
