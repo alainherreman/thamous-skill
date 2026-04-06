@@ -43,7 +43,7 @@ Actions actuellement prises en charge :
 - **modifier les mots-clefs et remarques**
   - sur une référence ;
   - sur la liste de projet ;
-  - avec blocage de suppression si le mot-clef ou la remarque est encore utilisé sur des références.
+  - avec avertissement si le mot-clef ou la remarque est encore utilisé sur des références, puis possibilité de forcer la suppression.
 
 Action distincte, à ne pas confondre avec l’enregistrement d’une liste :
 

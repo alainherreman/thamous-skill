@@ -586,6 +586,8 @@ def cmd_keywords_project(args: argparse.Namespace) -> None:
         "mot_clef": args.mot_clef,
         "definition": args.definition,
     }
+    if getattr(args, 'force', False):
+        payload["force"] = True
     code, data = _request(base_url=args.base_url, path="keywords_project", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format="json", payload=payload)
     if isinstance(data, dict) and isinstance(data.get("error"), dict):
         _emit_output(code, data, args.format)
@@ -615,6 +617,8 @@ def cmd_remarks_project(args: argparse.Namespace) -> None:
         "action": args.action_name,
         "remarque": args.remarque,
     }
+    if getattr(args, 'force', False):
+        payload["force"] = True
     code, data = _request(base_url=args.base_url, path="remarks_project", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format="json", payload=payload)
     if isinstance(data, dict) and isinstance(data.get("error"), dict):
         _emit_output(code, data, args.format)
@@ -727,6 +731,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--action", dest="action_name", required=True, choices=["add", "remove"])
     sp.add_argument("--mot-clef", dest="mot_clef", required=True)
     sp.add_argument("--definition")
+    sp.add_argument("--force", action="store_true")
 
     sp = sub.add_parser("remarks-ref")
     sp.add_argument("--id", required=True, type=int)
@@ -740,6 +745,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--project", required=True)
     sp.add_argument("--action", dest="action_name", required=True, choices=["add", "remove"])
     sp.add_argument("--remarque", required=True)
+    sp.add_argument("--force", action="store_true")
 
     for name in ["text-to-structure", "ask-logic"]:
         sp = sub.add_parser(name)

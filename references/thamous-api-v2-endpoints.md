@@ -171,10 +171,11 @@ Entrée :
 - `action` : `add` ou `remove`
 - `mot_clef`
 - `definition` facultative
+- `force` facultatif
 
 Contrôles :
 - utilisateur administrateur du projet ;
-- suppression refusée si le mot-clef est encore utilisé sur des références du projet.
+- suppression avec avertissement si le mot-clef est encore utilisé sur des références du projet ; possibilité de forcer.
 
 ### `remarks_ref`
 
@@ -204,7 +205,8 @@ Entrée :
 - `project`
 - `action` : `add` ou `remove`
 - `remarque`
+- `force` facultatif
 
 Contrôles :
 - utilisateur administrateur du projet ;
-- suppression refusée si la remarque est encore utilisée sur des références du projet.
+- suppression avec avertissement si la remarque est encore utilisée sur des références du projet ; possibilité de forcer.
