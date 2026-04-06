@@ -174,6 +174,12 @@ Toute demande à l’API doit préciser un **format de sortie demandé** :
 - Suivre un lien depuis la liste précédente :
   - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py follow-links --previous --link-type Cite --from source --to but --output-table tbiblio --project HilbertGG`
 
+## Règle de robustesse
+
+- la boucle de rétroaction est bornée à **3** corrections
+- au-delà, il ne faut pas insister
+- il faut demander à l'utilisateur de **décomposer la demande** en étapes plus simples
+
 ## Règles d’usage
 
 - Préférer `ask-logic` pour une recherche complète.
@@ -184,6 +190,7 @@ Toute demande à l’API doit préciser un **format de sortie demandé** :
 - Préférer `follow-links` quand l’utilisateur veut appliquer un type de lien à une liste précédente.
 - Si le nom de liste manque, le demander.
 - Préférer `text-to-structure --trace` quand il faut diagnostiquer la compréhension.
+- Après 3 rétroactions/corrections infructueuses, arrêter la correction locale et demander à l'utilisateur de décomposer la demande en étapes plus simples.
 - Utiliser `compile-logic` ou `replay-logic` quand on a déjà un JSON et qu’on veut isoler le problème sans relancer le LLM.
 - Utiliser `logic-context` avant une série de tests si le projet ou le vocabulaire est incertain.
 
