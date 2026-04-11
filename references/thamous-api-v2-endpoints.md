@@ -91,6 +91,10 @@ Retour :
 - `params`
 - et, pour `from_identifier`, les métadonnées détectées.
 
+Règle importante :
+- le champ `url` d'une référence doit pointer vers un accès au texte ;
+- ne pas le préremplir avec une simple URL de métadonnées.
+
 
 GET.
 

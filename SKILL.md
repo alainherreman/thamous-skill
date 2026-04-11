@@ -190,6 +190,10 @@ Toute demande à l’API doit préciser un **format de sortie demandé** :
 - Préparer une nouvelle référence à partir d'une référence existante :
   - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py prepare-ref --mode from-ref --source-table tbiblio --id-ref 1442 --generation meme_auteur_article --project HilbertGG`
 
+- Règle importante sur le champ `url` :
+  - ne remplir `url` que s'il s'agit d'un lien permettant d'accéder au texte lui-même ;
+  - ne pas y mettre une simple page de métadonnées (OpenLibrary, Crossref, catalogue, etc.).
+
 - Préparer une référence à partir d'un DOI ou d'un ISBN :
   - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py prepare-ref --mode from-identifier --identifier-type doi --identifier-value 10.2307/1968337 --project HilbertGG`
 
