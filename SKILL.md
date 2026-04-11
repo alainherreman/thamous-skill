@@ -18,6 +18,14 @@ Cette skill sert quand il faut :
 - réutiliser un résultat précédent ;
 - suivre un type de lien à partir d’une liste précédente.
 
+## Principe d'exécution
+
+- la skill doit fonctionner **sans validation intermédiaire** pour les opérations standard ;
+- elle doit exécuter directement les actions normales : ouverture, enregistrement de liste, ajout à une liste, suivi de liens, préparation d'une fiche, mutations de mots-clefs et de remarques ;
+- elle ne doit pas demander à l'utilisateur de confirmer une étape standard déjà demandée ;
+- elle ne doit demander quelque chose que s'il manque une information indispensable ou s'il existe un vrai choix utilisateur à trancher ;
+- exemple : si le nom d'une liste à enregistrer manque, il faut le demander ; sinon il faut agir directement.
+
 ## Actions prises en charge
 
 Actions actuellement prises en charge :
@@ -217,6 +225,7 @@ Toute demande à l’API doit préciser un **format de sortie demandé** :
 - Préférer `ask-logic` pour une recherche complète.
 - Les réponses de recherche sont limitées à **100 résultats** côté API ; la skill ne doit pas essayer de modifier cette limite.
 - Préférer `open-fiche` et `open-list` quand l’utilisateur demande explicitement une ouverture.
+- Ne pas demander de validation intermédiaire pour une action standard déjà demandée ; l'exécuter directement.
 - Préférer `save-list` quand l’utilisateur demande explicitement l’enregistrement d’une liste.
 - Préférer `add-to-list` quand l’utilisateur veut enrichir une liste précédente.
 - Préférer `follow-links` quand l’utilisateur veut appliquer un type de lien à une liste précédente.

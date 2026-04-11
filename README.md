@@ -14,6 +14,11 @@ Utilisation réelle :
 - le token Thamous peut être obtenu par l'API via `login_token`, puis fourni par `THAMOUS_TOKEN`, `THAMOUS_TOKEN_FILE` ou éventuellement Bitwarden ;
 - la clé fournisseur s'enregistre dans le menu `LLM`, où l'on choisit aussi le modèle.
 
+Principe d'usage :
+- la skill doit fonctionner **sans validation intermédiaire** pour les opérations standard ;
+- si l'utilisateur demande une action normale prise en charge, il faut l'exécuter directement ;
+- ne demander quelque chose que s'il manque une information indispensable ou s'il y a un vrai choix utilisateur à trancher.
+
 Actions explicites actuellement prises en charge :
 - ouvrir une fiche ;
 - ouvrir une liste ;
