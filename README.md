@@ -18,6 +18,7 @@ Principe d'usage :
 - la skill doit fonctionner **sans validation intermédiaire** pour les opérations standard ;
 - si l'utilisateur demande une action normale prise en charge, il faut l'exécuter directement ;
 - ne demander quelque chose que s'il manque une information indispensable ou s'il y a un vrai choix utilisateur à trancher.
+- les ouvertures standard (`open-fiche`, `open-list`, `prepare-ref` quand il renvoie un formulaire) doivent lancer directement `xdg-open`, sans validation intermédiaire.
 
 Actions explicites actuellement prises en charge :
 - ouvrir une fiche ;

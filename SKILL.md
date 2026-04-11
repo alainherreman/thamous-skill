@@ -25,6 +25,7 @@ Cette skill sert quand il faut :
 - elle ne doit pas demander à l'utilisateur de confirmer une étape standard déjà demandée ;
 - elle ne doit demander quelque chose que s'il manque une information indispensable ou s'il existe un vrai choix utilisateur à trancher ;
 - exemple : si le nom d'une liste à enregistrer manque, il faut le demander ; sinon il faut agir directement.
+- les ouvertures standard (`open-fiche`, `open-list`, `prepare-ref` quand il renvoie un formulaire) doivent lancer directement `xdg-open`, sans validation intermédiaire.
 
 ## Actions prises en charge
 
