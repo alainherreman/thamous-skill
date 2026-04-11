@@ -99,6 +99,26 @@ Il ne doit pas inventer ce nom.
 - dans ce cas, il faut résoudre les chaînes de `tbiblio.editeur` vers `trevues`, ou celles de `tbiblio.nom` vers `tpersonnes`
 - en revanche, pour une réponse JSON, on peut retourner directement les chaînes de `tbiblio.editeur` ou `tbiblio.nom` si c'est bien cela que demande l'utilisateur
 
+## Traductions
+
+- une demande portant sur des **traductions** est une opération de base de Thamous ; elle doit être comprise comme telle
+- quand l'utilisateur demande des *traductions de X* ou des *traductions en [langue] de X*, la recherche doit en principe passer par le **lien `Traduction`**
+- il ne faut donc pas réduire cela par défaut à un simple filtre direct sur `tbiblio.langue` ou sur le titre
+- sémantiquement :
+  - la **source** du lien `Traduction` est la **traduction**
+  - le **but** est le **texte traduit / l'œuvre d'origine**
+- si l'utilisateur précise une langue, cette langue porte en principe sur la **traduction**
+- si l'utilisateur précise un auteur et un titre pour l'œuvre visée, il faut comprendre :
+  - `nom` = auteur de l'œuvre d'origine
+  - `titre` = titre de l'œuvre d'origine
+- en conséquence, pour une demande du type :
+  - `les traductions en anglais de [titre] de [auteur]`
+  il faut en principe chercher :
+  - des `tbiblio` en anglais
+  - qui sont en lien `Traduction`
+  - avec une `tbiblio` dont `titre` correspond à l'œuvre visée et `nom` à son auteur
+- si le moteur produit seulement une recherche directe dans `tbiblio` sans lien `Traduction`, il faut considérer cela comme suspect et utiliser la rétroaction pour corriger
+
 ## Dates et années
 
 - dans Thamous, le champ `annee` doit être traité comme un **texte**

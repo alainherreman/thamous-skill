@@ -46,6 +46,20 @@ Commandes utiles :
 Par défaut, `add-to-list` et `follow-links` réutilisent la liste locale précédente compatible.
 La “liste précédente” est le dernier résultat local dont le type est une table Thamous avec une liste d’ids.
 
+## Traductions
+
+- une demande portant sur des **traductions** est une opération de base de Thamous ; elle doit être comprise comme telle
+- quand l'utilisateur demande des *traductions de X* ou des *traductions en [langue] de X*, la recherche doit en principe passer par le **lien `Traduction`**
+- il ne faut donc pas réduire cela par défaut à un simple filtre direct sur `tbiblio.langue` ou sur le titre
+- sémantiquement :
+  - la **source** du lien `Traduction` est la **traduction**
+  - le **but** est le **texte traduit / l'œuvre d'origine**
+- si l'utilisateur précise une langue, cette langue porte en principe sur la **traduction**
+- si l'utilisateur précise un auteur et un titre pour l'œuvre visée, il faut comprendre :
+  - `nom` = auteur de l'œuvre d'origine
+  - `titre` = titre de l'œuvre d'origine
+- si le moteur produit seulement une recherche directe dans `tbiblio` sans lien `Traduction`, il faut considérer cela comme suspect et utiliser la rétroaction pour corriger
+
 ## Dates
 
 Le champ `annee` doit être traité comme un **texte**.
