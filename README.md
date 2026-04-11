@@ -50,3 +50,12 @@ Donc :
 
 Exemple :
 - `antérieur à 1900` → préférer une contrainte du type `annee commence par 18`
+
+## Revues, auteurs, et champs textuels
+
+- dans `tbiblio`, le champ `editeur` d'un **article** contient en pratique le titre de la revue où l'article est publié
+- de même, le champ `nom` d'une publication contient en pratique le nom de ses auteurs, en correspondance avec `tpersonnes`
+- ce problème concerne surtout l'ouverture d'une liste Thamous ou toute demande dont le résultat doit être une vraie table Thamous (`trevues`, `tpersonnes`)
+- dans ce cas, il faut résoudre les chaînes de `tbiblio.editeur` vers `trevues`, ou celles de `tbiblio.nom` vers `tpersonnes`
+- en revanche, pour une réponse JSON, on peut retourner directement les chaînes de `tbiblio.editeur` ou `tbiblio.nom` si c'est bien cela que demande l'utilisateur
+

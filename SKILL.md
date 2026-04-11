@@ -48,7 +48,8 @@ Actions actuellement prises en charge :
 
 Action distincte, à ne pas confondre avec l’enregistrement d’une liste :
 
-- **créer / enregistrer une fiche ou une entrée**.
+- **préparer une fiche ou une entrée**
+  - en ouvrant le formulaire Thamous prérempli avant enregistrement.
 
 Si la demande de l’utilisateur ne correspond pas à une action réellement prise en charge par la skill et l’API, il faut le dire explicitement et ne pas improviser une autre action à la place.
 
@@ -80,6 +81,14 @@ Il ne doit pas inventer ce nom.
 - ces opérations modifient la liste existante sauf si un autre nom est explicitement demandé
 - la `liste précédente` désigne le dernier résultat local dont le type est une table Thamous avec une liste d'ids
 - si l'utilisateur dit **`la liste précédente`**, **`la liste antérieure`**, **`le résultat précédent`** ou une formulation équivalente, la skill doit comprendre qu'il faut utiliser ce dernier résultat local compatible
+
+## Revues, auteurs, et champs textuels
+
+- dans `tbiblio`, le champ `editeur` d'un **article** contient en pratique le titre de la revue où l'article est publié
+- de même, le champ `nom` d'une publication contient en pratique le nom de ses auteurs, en correspondance avec `tpersonnes`
+- ce problème concerne surtout l'ouverture d'une liste Thamous ou toute demande dont le résultat doit être une vraie table Thamous (`trevues`, `tpersonnes`)
+- dans ce cas, il faut résoudre les chaînes de `tbiblio.editeur` vers `trevues`, ou celles de `tbiblio.nom` vers `tpersonnes`
+- en revanche, pour une réponse JSON, on peut retourner directement les chaînes de `tbiblio.editeur` ou `tbiblio.nom` si c'est bien cela que demande l'utilisateur
 
 ## Dates et années
 
@@ -135,6 +144,7 @@ Bitwarden peut être utilisé pour fournir le token Thamous, mais ce n'est qu'un
 - `save_logic`
 - `fiche_url`
 - `follow_links`
+- `prepare_ref`
 - `keywords_ref`
 - `keywords_project`
 - `remarks_ref`
@@ -173,6 +183,15 @@ Toute demande à l’API doit préciser un **format de sortie demandé** :
 
 - Ouvrir une liste :
   - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py open-list --q "Les livres de Klein traduits en anglais" --project perso --provider OpenAI --model GPT-5.2`
+
+- Préparer une nouvelle référence directe :
+  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py prepare-ref --mode direct --table tbiblio --type Article --project HilbertGG --nom "Poincaré, Henri" --titre "Titre à compléter" --annee 1900`
+
+- Préparer une nouvelle référence à partir d'une référence existante :
+  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py prepare-ref --mode from-ref --source-table tbiblio --id-ref 1442 --generation meme_auteur_article --project HilbertGG`
+
+- Préparer une référence à partir d'un DOI ou d'un ISBN :
+  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py prepare-ref --mode from-identifier --identifier-type doi --identifier-value 10.2307/1968337 --project HilbertGG`
 
 - Enregistrer une liste en extension :
   - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py save-list --q "Les livres de Klein traduits en anglais" --nom-liste "Klein traduits en anglais" --save-mode extension --project perso --provider OpenAI --model GPT-5.2`

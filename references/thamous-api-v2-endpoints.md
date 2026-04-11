@@ -65,6 +65,41 @@ Paramètres :
 - `projet` facultatif
 - `format` (`json` ou `url`)
 
+### `prepare_ref`
+
+POST JSON.
+
+But :
+- préparer une nouvelle référence ;
+- ouvrir le formulaire Thamous prérempli ;
+- laisser le contrôle humain avant l'enregistrement effectif.
+
+Modes :
+- `mode=direct`
+- `mode=from_ref`
+- `mode=from_identifier`
+
+Entrées usuelles :
+- `projet`
+- `table` / `type` pour `direct`
+- `source_table`, `id_ref`, `generation` pour `from_ref`
+- `identifier_type=doi|isbn`, `identifier_value` pour `from_identifier`
+- `fields` ou champs plats (`nom`, `titre`, `annee`, etc.)
+
+Retour :
+- `form_url`
+- `params`
+- et, pour `from_identifier`, les métadonnées détectées.
+
+
+GET.
+
+Paramètres :
+- `id`
+- `table`
+- `projet` facultatif
+- `format` (`json` ou `url`)
+
 ### `logic_context`
 
 GET.
@@ -210,3 +245,12 @@ Entrée :
 Contrôles :
 - utilisateur administrateur du projet ;
 - suppression avec avertissement si la remarque est encore utilisée sur des références du projet ; possibilité de forcer.
+
+
+## Revues, auteurs, et champs textuels
+
+- Dans `tbiblio`, le champ `editeur` d'un article contient en pratique le titre de la revue.
+- Le champ `nom` d'une publication contient en pratique le nom de ses auteurs, en correspondance avec `tpersonnes`.
+- Ce point devient crucial quand on veut ouvrir une liste Thamous ou obtenir une vraie liste de `trevues` ou de `tpersonnes`.
+- Dans ce cas, il faut résoudre les chaînes vers les tables correspondantes.
+- Pour une réponse JSON simple, on peut retourner directement les valeurs textuelles de `tbiblio.editeur` ou `tbiblio.nom`.

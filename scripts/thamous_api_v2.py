@@ -451,6 +451,76 @@ def cmd_open_list(args: argparse.Namespace) -> None:
         print(url)
 
 
+
+def cmd_prepare_ref(args: argparse.Namespace) -> None:
+    payload: dict[str, Any] = {}
+    if args.mode:
+        payload["mode"] = args.mode
+    if args.project:
+        payload["projet"] = args.project
+    if args.mode == "direct":
+        payload["table"] = args.table
+        if args.type:
+            payload["type"] = args.type
+    elif args.mode == "from-ref":
+        payload["mode"] = "from_ref"
+        payload["source_table"] = args.source_table
+        payload["id_ref"] = args.id_ref
+        payload["generation"] = args.generation
+    elif args.mode == "from-identifier":
+        payload["mode"] = "from_identifier"
+        payload["identifier_type"] = args.identifier_type
+        payload["identifier_value"] = args.identifier_value
+        if args.table:
+            payload["table"] = args.table
+        if args.type:
+            payload["type"] = args.type
+
+    fields: dict[str, Any] = {}
+    for key in ["nom", "titre", "annee", "pages", "langue", "editeur", "lieu", "url", "serie", "volume", "tomaison", "doi"]:
+        val = getattr(args, key, None)
+        if val not in (None, ""):
+            fields[key] = val
+    if fields:
+        payload["fields"] = fields
+
+    code, data = _request(
+        base_url=args.base_url,
+        path="prepare_ref",
+        method="POST",
+        auth=True,
+        timeout_s=args.timeout,
+        verbose=args.verbose,
+        raw=False,
+        response_format="url" if not args.json_only else "json",
+        payload=payload,
+    )
+
+    url = ""
+    if isinstance(data, dict):
+        if data.get("form_url"):
+            url = str(data["form_url"]).strip()
+        elif data.get("_raw"):
+            url = str(data["_raw"]).strip()
+    elif isinstance(data, str):
+        url = data.strip()
+
+    if args.json_only:
+        _emit_output(code, data, args.format)
+        return
+
+    if not url:
+        _emit_output(code, data, args.format)
+        return
+    if args.print_only:
+        print(url)
+        return
+    subprocess.check_call(["xdg-open", url])
+    if args.format == "json":
+        print(json.dumps({"url": url}, ensure_ascii=False, indent=2))
+    else:
+        print(url)
+
 def cmd_save_list(args: argparse.Namespace) -> None:
     payload = _base_payload_from_args(args)
     payload["nom_liste"] = args.nom_liste
@@ -678,6 +748,31 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--derive-limit", type=int, dest="derive_limit")
     sp.add_argument("--print-only", action="store_true", help="Retourner l'URL sans lancer le navigateur.")
 
+    sp = sub.add_parser("prepare-ref")
+    sp.add_argument("--mode", required=True, choices=["direct", "from-ref", "from-identifier"])
+    sp.add_argument("--project")
+    sp.add_argument("--table")
+    sp.add_argument("--type")
+    sp.add_argument("--source-table")
+    sp.add_argument("--id-ref", dest="id_ref", type=int)
+    sp.add_argument("--generation")
+    sp.add_argument("--identifier-type", dest="identifier_type", choices=["doi", "isbn"])
+    sp.add_argument("--identifier-value", dest="identifier_value")
+    sp.add_argument("--nom")
+    sp.add_argument("--titre")
+    sp.add_argument("--annee")
+    sp.add_argument("--pages")
+    sp.add_argument("--langue")
+    sp.add_argument("--editeur")
+    sp.add_argument("--lieu")
+    sp.add_argument("--url")
+    sp.add_argument("--serie")
+    sp.add_argument("--volume")
+    sp.add_argument("--tomaison")
+    sp.add_argument("--doi")
+    sp.add_argument("--print-only", action="store_true", help="Retourner l'URL sans lancer le navigateur.")
+    sp.add_argument("--json-only", action="store_true", help="Demander et afficher la réponse JSON complète sans ouvrir le formulaire.")
+
     sp = sub.add_parser("save-list")
     sp.add_argument("--q", required=True)
     sp.add_argument("--nom-liste", required=True)
@@ -809,6 +904,9 @@ def main() -> None:
         return
     elif args.action == "open-list":
         cmd_open_list(args)
+        return
+    elif args.action == "prepare-ref":
+        cmd_prepare_ref(args)
         return
     elif args.action == "save-list":
         cmd_save_list(args)
