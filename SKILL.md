@@ -157,9 +157,12 @@ Après installation de la skill, utiliser :
     3. copier la valeur `token`
     4. l’enregistrer localement avec :
        - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py save-token --token VOTRE_TOKEN`
+       - le token est alors stocké par défaut dans `~/.config/thamous/token`
+       - les commandes normales de la skill le relisent automatiquement à cet emplacement
   - vérifier ensuite avec :
     - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py token-status`
   - si `token-status` renvoie `expired_or_invalid`, il faut simplement régénérer un nouveau token par la même procédure.
+  - côté serveur, l’API v2 accepte maintenant de nouveau correctement `Authorization: Bearer ...` ; le client conserve aussi ses autres modes compatibles.
 - **Clé API fournisseur** : dans Thamous, ouvrir le menu `LLM`, enregistrer une clé API pour le fournisseur voulu, puis choisir un modèle. Cette clé reste enregistrée dans Thamous pour le compte utilisateur.
 
 ### Important

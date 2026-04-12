@@ -13,9 +13,11 @@ Utilisation réelle :
 - nécessite aussi une **clé API fournisseur LLM** ;
 - le token Thamous se récupère simplement depuis une session web Thamous connectée via `https://thamous.ouvaton.org/thamous/php/ajax_get_api_token.php`, puis s’enregistre localement avec :
   - `python3 scripts/thamous_api_v2.py save-token --token VOTRE_TOKEN`
+- il est alors stocké par défaut dans `~/.config/thamous/token`, relu automatiquement par les commandes normales ;
 - son état se vérifie avec :
   - `python3 scripts/thamous_api_v2.py token-status`
 - si `token-status` indique `expired_or_invalid`, il faut juste régénérer un nouveau token par la même procédure ;
+- l’API v2 accepte à nouveau correctement le header `Authorization: Bearer ...` côté serveur ;
 - la clé fournisseur s'enregistre dans le menu `LLM`, où l'on choisit aussi le modèle.
 
 Principe d'usage :

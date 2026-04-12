@@ -35,7 +35,7 @@ def get_token() -> str:
     if tok:
         return tok.strip()
 
-    tok_file = os.environ.get("THAMOUS_TOKEN_FILE")
+    tok_file = os.environ.get("THAMOUS_TOKEN_FILE") or DEFAULT_TOKEN_FILE
     if tok_file:
         try:
             return _read_text_file(tok_file).strip()
