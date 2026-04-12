@@ -25,7 +25,7 @@ Cette skill sert quand il faut :
 - elle ne doit pas demander à l'utilisateur de confirmer une étape standard déjà demandée ;
 - elle ne doit demander quelque chose que s'il manque une information indispensable ou s'il existe un vrai choix utilisateur à trancher ;
 - exemple : si le nom d'une liste à enregistrer manque, il faut le demander ; sinon il faut agir directement.
-- les ouvertures standard (`open-fiche`, `open-list`, `prepare-ref` quand il renvoie un formulaire) doivent lancer directement `xdg-open`, sans validation intermédiaire.
+- les ouvertures standard (`open-fiche`, `open-list`, `prepare-ref` quand il renvoie un formulaire) doivent lancer directement l’ouverture locale du navigateur, sans validation intermédiaire.
 
 ## Actions prises en charge
 
@@ -136,9 +136,41 @@ Règle :
 
 ## Chemin du client
 
-Après installation de la skill, utiliser :
+Commande canonique à utiliser après installation de la skill, selon l’OS :
+
+- Linux / macOS :
+  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 ...`
+- Windows `cmd.exe` :
+  - `%USERPROFILE%\\.codex\\skills\\thamous-api-v2\\bin\\thamous-v2.cmd ...`
+- Windows PowerShell :
+  - `& "$HOME/.codex/skills/thamous-api-v2/bin/thamous-v2.ps1" ...`
+
+Dans le dépôt de développement de la skill :
+
+- Linux / macOS : `./bin/thamous-v2 ...`
+- Windows `cmd.exe` : `bin\\thamous-v2.cmd ...`
+- Windows PowerShell : `& ".\\bin\\thamous-v2.ps1" ...`
+
+Script sous-jacent, à n’utiliser qu’en secours ou pour maintenance explicite :
 
 - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py ...`
+
+## Verrou structurel contre les variantes
+
+Pour cette skill, il faut aligner la règle métier et la mécanique technique :
+
+1. **une famille de commandes canonique**
+   - utiliser le wrapper canonique du système (`bin/thamous-v2`, `bin\\thamous-v2.cmd` ou `bin/thamous-v2.ps1`) ;
+   - ne pas improviser de `curl`, de `python -c`, ni de variante shell si le wrapper couvre le besoin ;
+2. **des sous-commandes canoniques**
+   - utiliser les sous-commandes réellement exposées par le client (`health`, `save-token`, `token-status`, `logic-context`, `fiche-url`, `open-fiche`, `open-list`, `text-to-structure`, `ask-logic`, `compile-logic`, `search-logic`, `replay-logic`) ;
+3. **une discipline d’approbation**
+   - pour l’usage standard de la skill, ne pas passer par `require_escalated` ;
+   - ne pas changer de forme de commande juste pour “faire plus riche” ;
+   - si une ouverture navigateur n’est pas explicitement demandée, préférer une commande qui renvoie l’URL ou le JSON plutôt qu’une ouverture locale ;
+   - si un doute d’exécution apparaît, préférer la forme canonique la plus simple déjà prévue par la skill.
+
+Conséquence pratique : le wrapper canonique du système est l’entrée normale ; le script Python direct est une implémentation interne.
 
 ## Pré-requis
 
@@ -255,9 +287,11 @@ Toute demande à l’API doit préciser un **format de sortie demandé** :
 
 ## Règles d’usage
 
+- Utiliser le wrapper canonique du système ; éviter les variantes ad hoc tant qu’il couvre le besoin.
 - Préférer `ask-logic` pour une recherche complète.
 - Les réponses de recherche sont limitées à **100 résultats** côté API ; la skill ne doit pas essayer de modifier cette limite.
 - Préférer `open-fiche` et `open-list` quand l’utilisateur demande explicitement une ouverture.
+- Quand l’utilisateur ne demande pas explicitement l’ouverture, préférer l’URL canonique ou le JSON plutôt qu’une commande qui déclenche une ouverture locale du navigateur.
 - Ne pas demander de validation intermédiaire pour une action standard déjà demandée ; l'exécuter directement.
 - Préférer `save-list` quand l’utilisateur demande explicitement l’enregistrement d’une liste.
 - Préférer `add-to-list` quand l’utilisateur veut enrichir une liste précédente.
