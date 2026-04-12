@@ -11,7 +11,11 @@ Contenu :
 Utilisation réelle :
 - nécessite un **token Thamous** ;
 - nécessite aussi une **clé API fournisseur LLM** ;
-- le token Thamous peut être obtenu par l'API via `login_token`, puis fourni par `THAMOUS_TOKEN`, `THAMOUS_TOKEN_FILE` ou éventuellement Bitwarden ;
+- le token Thamous se récupère simplement depuis une session web Thamous connectée via `https://thamous.ouvaton.org/thamous/php/ajax_get_api_token.php`, puis s’enregistre localement avec :
+  - `python3 scripts/thamous_api_v2.py save-token --token VOTRE_TOKEN`
+- son état se vérifie avec :
+  - `python3 scripts/thamous_api_v2.py token-status`
+- si `token-status` indique `expired_or_invalid`, il faut juste régénérer un nouveau token par la même procédure ;
 - la clé fournisseur s'enregistre dans le menu `LLM`, où l'on choisit aussi le modèle.
 
 Principe d'usage :
@@ -78,4 +82,3 @@ Exemple :
 - ce problème concerne surtout l'ouverture d'une liste Thamous ou toute demande dont le résultat doit être une vraie table Thamous (`trevues`, `tpersonnes`)
 - dans ce cas, il faut résoudre les chaînes de `tbiblio.editeur` vers `trevues`, ou celles de `tbiblio.nom` vers `tpersonnes`
 - en revanche, pour une réponse JSON, on peut retourner directement les chaînes de `tbiblio.editeur` ou `tbiblio.nom` si c'est bien cela que demande l'utilisateur
-

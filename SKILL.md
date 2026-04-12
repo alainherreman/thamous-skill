@@ -150,7 +150,16 @@ Après installation de la skill, utiliser :
 
 ### Obtenir les accès
 
-- **Token Thamous** : soit l'obtenir directement par l'API avec `login_token` en fournissant `login` et `mot de passe`, soit le fournir à la skill de l'une des manières suivantes : `THAMOUS_TOKEN`, `THAMOUS_TOKEN_FILE`, ou éventuellement Bitwarden si cette solution est disponible.
+- **Token Thamous** :
+  - procédure simple recommandée :
+    1. se connecter sur `https://thamous.ouvaton.org/thamous/`
+    2. ouvrir `https://thamous.ouvaton.org/thamous/php/ajax_get_api_token.php`
+    3. copier la valeur `token`
+    4. l’enregistrer localement avec :
+       - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py save-token --token VOTRE_TOKEN`
+  - vérifier ensuite avec :
+    - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py token-status`
+  - si `token-status` renvoie `expired_or_invalid`, il faut simplement régénérer un nouveau token par la même procédure.
 - **Clé API fournisseur** : dans Thamous, ouvrir le menu `LLM`, enregistrer une clé API pour le fournisseur voulu, puis choisir un modèle. Cette clé reste enregistrée dans Thamous pour le compte utilisateur.
 
 ### Important
@@ -191,11 +200,11 @@ Toute demande à l’API doit préciser un **format de sortie demandé** :
 - Santé :
   - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py health`
 
-- Obtenir un token Thamous par l'API :
-  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py login-token --login MON_LOGIN --password MON_MOT_DE_PASSE`
+- Enregistrer un token récupéré depuis le site :
+  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py save-token --token VOTRE_TOKEN`
 
-- Obtenir et enregistrer le token dans un fichier :
-  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py login-token --login MON_LOGIN --password MON_MOT_DE_PASSE --write-token-file ~/.config/thamous/token`
+- Vérifier si le token local est valide ou expiré :
+  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py token-status`
 
 - Contexte logique :
   - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py logic-context --projet HilbertGG`

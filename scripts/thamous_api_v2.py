@@ -7,17 +7,18 @@ import argparse
 import datetime as _dt
 import json
 import os
-import re
+import pathlib
 import subprocess
 import sys
 import time
+import webbrowser
 from typing import Any, Iterable
 
 import requests
 
 DEFAULT_BASE_URL = "https://thamous.ouvaton.org/thamous/php/api/v2/index.php"
 DEFAULT_BW_ITEM_NAME = "Al1 - Thamous API Token"
-DEFAULT_HISTORY_FILE = os.path.expanduser("~/.config/thamous/history_v2.json")
+DEFAULT_TOKEN_FILE = os.path.expanduser("~/.config/thamous/token")
 
 
 def _read_text_file(path: str) -> str:
@@ -25,137 +26,8 @@ def _read_text_file(path: str) -> str:
         return f.read()
 
 
-def _history_file() -> str:
-    return os.environ.get("THAMOUS_HISTORY_FILE", DEFAULT_HISTORY_FILE)
-
-
 def _ensure_parent_dir(path: str) -> None:
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-
-
-def _load_history() -> list[dict[str, Any]]:
-    path = _history_file()
-    try:
-        with open(path, "r", encoding="utf-8") as fh:
-            data = json.load(fh)
-        if isinstance(data, list):
-            return [x for x in data if isinstance(x, dict)]
-    except Exception:
-        pass
-    return []
-
-
-def _save_history(entries: list[dict[str, Any]]) -> None:
-    path = _history_file()
-    _ensure_parent_dir(path)
-    with open(path, "w", encoding="utf-8") as fh:
-        json.dump(entries[-200:], fh, ensure_ascii=False, indent=2)
-
-
-def _slug(text: str) -> str:
-    text = text.strip().lower()
-    text = re.sub(r"[^\w\s-]", " ", text, flags=re.UNICODE)
-    text = re.sub(r"[\s_-]+", "_", text, flags=re.UNICODE).strip("_")
-    return text or "resultat"
-
-
-def _infer_result_type(data: Any) -> tuple[str, list[Any]]:
-    if not isinstance(data, dict):
-        return "", []
-    results = data.get("results")
-    if not isinstance(results, list):
-        return "", []
-    if results == []:
-        table = ""
-        if isinstance(data.get("compiled"), dict):
-            table = str(data["compiled"].get("table") or "").strip()
-        return (table or "", [])
-    first = results[0]
-    if isinstance(first, dict):
-        if "remarques" in first:
-            vals = [str(r.get("remarques", "")) for r in results if isinstance(r, dict)]
-            return "remarques", vals
-        if "mot_clef" in first or "mots_clefs" in first:
-            vals = []
-            for r in results:
-                if not isinstance(r, dict):
-                    continue
-                if "mot_clef" in r:
-                    vals.append(str(r.get("mot_clef", "")))
-                elif "mots_clefs" in r:
-                    vals.append(str(r.get("mots_clefs", "")))
-            return "mots_clefs", vals
-        table = ""
-        if isinstance(data.get("compiled"), dict):
-            table = str(data["compiled"].get("table") or "").strip()
-        if not table and all(isinstance(r, dict) and "support" in r for r in results):
-            table = "tremarques"
-        ids = [r.get("id") for r in results if isinstance(r, dict) and r.get("id") not in (None, "")]
-        if table and ids:
-            return table, ids
-    return "", []
-
-
-def _store_named_result(name: str, question: str, data: Any) -> dict[str, Any] | None:
-    result_type, values = _infer_result_type(data)
-    if result_type == "":
-        return None
-    entry = {
-        "name": name,
-        "type": result_type,
-        "value": values,
-        "question": question,
-        "reformulation": data.get("structure_response", {}).get("reformulation", "") if isinstance(data, dict) else "",
-        "created_at": _dt.datetime.now().isoformat(timespec="seconds"),
-    }
-    history = [e for e in _load_history() if e.get("name") != name]
-    history.append(entry)
-    _save_history(history)
-    return entry
-
-
-def _find_history_entry(name: str | None = None, previous: bool = False) -> dict[str, Any] | None:
-    history = _load_history()
-    if not history:
-        return None
-    if previous or not name:
-        for entry in reversed(history):
-            t = str(entry.get("type", "")).strip()
-            if t not in ("", "mots_clefs", "remarques"):
-                return entry
-        return None
-    for entry in reversed(history):
-        if str(entry.get("name", "")).strip() == name:
-            return entry
-    return None
-
-
-def _dedupe_keep_order(values: list[Any]) -> list[Any]:
-    out: list[Any] = []
-    seen: set[str] = set()
-    for v in values:
-        key = json.dumps(v, ensure_ascii=False, sort_keys=True) if isinstance(v, (dict, list)) else str(v)
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(v)
-    return out
-
-
-def _store_raw_entry(entry: dict[str, Any]) -> dict[str, Any]:
-    history = [e for e in _load_history() if e.get("name") != entry.get("name")]
-    history.append(entry)
-    _save_history(history)
-    return entry
-
-
-def _auto_result_name(question: str, data: Any) -> str:
-    base = _slug(question)[:60]
-    if not base:
-        base = "resultat"
-    result_type, _ = _infer_result_type(data)
-    suffix = result_type or "liste"
-    return f"{base}__{suffix}"
+    pathlib.Path(path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
 
 
 def get_token() -> str:
@@ -199,7 +71,28 @@ def get_token() -> str:
     except Exception:
         pass
 
-    raise SystemExit("THAMOUS_TOKEN manquant. Exporte THAMOUS_TOKEN=... ou THAMOUS_TOKEN_FILE=... puis réessaie.")
+    raise SystemExit(
+        "THAMOUS_TOKEN manquant. "
+        "Enregistre-le dans ~/.config/thamous/token "
+        "ou utilise --token-file /chemin/vers/token. "
+        "Pour le régénérer depuis le web : connecte-toi à Thamous puis ouvre "
+        "https://thamous.ouvaton.org/thamous/php/ajax_get_api_token.php"
+    )
+
+
+def _token_help_message() -> str:
+    return (
+        "Token Thamous invalide ou expiré.\n"
+        "Procédure simple :\n"
+        "1. Se connecter sur https://thamous.ouvaton.org/thamous/\n"
+        "2. Ouvrir https://thamous.ouvaton.org/thamous/php/ajax_get_api_token.php\n"
+        "3. Copier la valeur `token`\n"
+        "4. L’enregistrer avec :\n"
+        "   python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py "
+        "save-token --token VOTRE_TOKEN\n"
+        "5. Vérifier avec :\n"
+        "   python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py token-status"
+    )
 
 
 def _as_str(v: Any) -> str:
@@ -211,7 +104,18 @@ def _as_str(v: Any) -> str:
 
 
 def _pick_table_columns(rows: list[dict[str, Any]]) -> list[str]:
-    preferred = ["name", "type", "question", "created_at", "id", "nom", "titre", "annee", "langue", "editeur", "count", "role", "url"]
+    preferred = [
+        "id",
+        "nom",
+        "titre",
+        "annee",
+        "type",
+        "langue",
+        "editeur",
+        "count",
+        "role",
+        "url",
+    ]
     present = [k for k in preferred if any(k in r and r.get(k) not in (None, "") for r in rows)]
     if present:
         return present[:8]
@@ -240,7 +144,19 @@ def _print_table(rows: list[dict[str, Any]]) -> None:
         print(fmt_line(row))
 
 
-def _request(*, base_url: str, path: str, method: str, auth: bool, timeout_s: int, verbose: bool, raw: bool, response_format: str, params: dict[str, Any] | None = None, payload: dict[str, Any] | None = None) -> tuple[int, Any]:
+def _request(
+    *,
+    base_url: str,
+    path: str,
+    method: str,
+    auth: bool,
+    timeout_s: int,
+    verbose: bool,
+    raw: bool,
+    response_format: str,
+    params: dict[str, Any] | None = None,
+    payload: dict[str, Any] | None = None,
+) -> tuple[int, Any]:
     headers: dict[str, str] = {}
     token = ""
     if auth:
@@ -302,7 +218,6 @@ def _load_json_from_args(payload_file: str | None, payload_json: str | None) -> 
         raise SystemExit("Le payload JSON doit être un objet.")
     return data
 
-
 def _maybe_set(payload: dict[str, Any], key: str, value: Any) -> None:
     if value is not None and value != "":
         payload[key] = value
@@ -319,6 +234,7 @@ def _base_payload_from_args(args: argparse.Namespace) -> dict[str, Any]:
     _maybe_set(payload, "indication", getattr(args, "indication", None))
     _maybe_set(payload, "feedback", getattr(args, "feedback", None))
     _maybe_set(payload, "reformulation_precedente", getattr(args, "reformulation_precedente", None))
+    _maybe_set(payload, "limit", getattr(args, "limit", None))
     _maybe_set(payload, "offset", getattr(args, "offset", None))
     _maybe_set(payload, "order1", getattr(args, "order1", None))
     _maybe_set(payload, "order2", getattr(args, "order2", None))
@@ -332,6 +248,7 @@ def _emit_output(code: int, data: Any, fmt: str) -> None:
     if fmt == "json":
         print(json.dumps(data, ensure_ascii=False, indent=2))
         return
+
     if fmt == "jsonl":
         if isinstance(data, dict) and isinstance(data.get("results"), list):
             for row in data["results"]:
@@ -339,6 +256,7 @@ def _emit_output(code: int, data: Any, fmt: str) -> None:
             return
         print(json.dumps(data, ensure_ascii=False))
         return
+
     if isinstance(data, dict):
         if isinstance(data.get("results"), list):
             if "total" in data:
@@ -352,58 +270,149 @@ def _emit_output(code: int, data: Any, fmt: str) -> None:
             for item in data["types_biblio"]:
                 print(item)
             return
+
     print(json.dumps(data, ensure_ascii=False, indent=2))
 
 
-def _maybe_store_history(args: argparse.Namespace, data: Any) -> None:
-    if not isinstance(data, dict) or getattr(args, "no_history", False):
-        return
-    question = str(getattr(args, "q", "") or "").strip()
-    if question == "":
-        return
-    chosen_name = str(getattr(args, "result_name", "") or "").strip()
-    if chosen_name == "":
-        chosen_name = _auto_result_name(question, data)
-    entry = _store_named_result(chosen_name, question, data)
-    if entry is not None:
-        print(f"\n[result_name] {entry['name']}", file=sys.stderr)
-        print(f"[result_type] {entry['type']}", file=sys.stderr)
-
-
-def cmd_login_token(args: argparse.Namespace) -> None:
-    payload = {"login": args.login, "password": args.password}
-    code, data = _request(
-        base_url=args.base_url,
-        path="login_token",
-        method="POST",
-        auth=False,
-        timeout_s=args.timeout,
-        verbose=args.verbose,
-        raw=args.raw,
-        response_format="json",
-        payload=payload,
+def cmd_save_token(args: argparse.Namespace) -> None:
+    token_file = os.path.expanduser(args.token_file or DEFAULT_TOKEN_FILE)
+    token = (args.token or "").strip()
+    if not token:
+        raise SystemExit("Token vide.")
+    _ensure_parent_dir(token_file)
+    with open(token_file, "w", encoding="utf-8") as fh:
+        fh.write(token)
+    print(
+        json.dumps(
+            {
+                "ok": True,
+                "token_file": token_file,
+                "length": len(token),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
     )
-    if isinstance(data, dict) and isinstance(data.get("error"), dict):
-        _emit_output(code, data, args.format)
+
+
+def cmd_token_status(args: argparse.Namespace) -> None:
+    token_file = os.path.expanduser(args.token_file or os.environ.get("THAMOUS_TOKEN_FILE") or DEFAULT_TOKEN_FILE)
+    source = None
+    token = None
+    if os.environ.get("THAMOUS_TOKEN"):
+        token = os.environ["THAMOUS_TOKEN"].strip()
+        source = "env:THAMOUS_TOKEN"
+    elif os.path.exists(token_file):
+        token = _read_text_file(token_file).strip()
+        source = token_file
+    else:
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "status": "missing",
+                    "message": "Aucun token local trouvé.",
+                    "expected_token_file": token_file,
+                    "help": _token_help_message(),
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
         raise SystemExit(1)
 
-    token = ""
-    if isinstance(data, dict):
-        token = str(data.get("token", "")).strip()
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "X-Authorization": f"Bearer {token}",
+        "X-Thamous-Token": token,
+    }
+    try:
+        response = requests.get(
+            args.base_url,
+            params={"path": "logic_context", "projet": args.projet, "token": token},
+            headers=headers,
+            timeout=args.timeout,
+        )
+        data = response.json()
+    except Exception as exc:
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "status": "error",
+                    "source": source,
+                    "message": str(exc),
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        raise SystemExit(1)
 
-    if token and args.write_token_file:
-        with open(args.write_token_file, "w", encoding="utf-8") as fh:
-            fh.write(token + "\n")
+    if isinstance(data, dict) and isinstance(data.get("error"), dict):
+        err = data["error"]
+        code = str(err.get("code") or "")
+        message = str(err.get("message") or "")
+        expired = code == "UNAUTHORIZED" and message in {"Invalid token", "Missing token"}
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "status": "expired_or_invalid" if expired else "error",
+                    "source": source,
+                    "error": err,
+                    "help": _token_help_message() if expired else "",
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        raise SystemExit(1)
 
-    if args.token_only and token:
-        print(token)
+    print(
+        json.dumps(
+            {
+                "ok": True,
+                "status": "valid",
+                "source": source,
+                "signature": data.get("signature"),
+                "projects": data.get("projects"),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+
+
+def _open_url(url: str) -> None:
+    url = (url or "").strip()
+    if not url:
+        raise SystemExit("URL vide, ouverture impossible.")
+    if webbrowser.open(url):
         return
 
-    _emit_output(code, data, args.format)
+    if sys.platform.startswith("darwin"):
+        fallback = ["open", url]
+    elif os.name == "nt":
+        fallback = ["cmd", "/c", "start", "", url]
+    else:
+        fallback = ["xdg-open", url]
+    subprocess.check_call(fallback)
+
 
 
 def cmd_fiche_url(args: argparse.Namespace) -> None:
-    code, data = _request(base_url=args.base_url, path="fiche_url", method="GET", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format, params={"id": args.id, "table": args.table, **({"projet": args.projet} if args.projet else {})})
+    code, data = _request(
+        base_url=args.base_url,
+        path="fiche_url",
+        method="GET",
+        auth=True,
+        timeout_s=args.timeout,
+        verbose=args.verbose,
+        raw=args.raw,
+        response_format=args.response_format,
+        params={"id": args.id, "table": args.table, **({"projet": args.projet} if args.projet else {})},
+    )
     if args.response_format == "url" and isinstance(data, dict) and data.get("_raw"):
         print(str(data.get("_raw", "")).strip())
         return
@@ -411,7 +420,17 @@ def cmd_fiche_url(args: argparse.Namespace) -> None:
 
 
 def cmd_open_fiche(args: argparse.Namespace) -> None:
-    code, data = _request(base_url=args.base_url, path="fiche_url", method="GET", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=False, response_format="url", params={"id": args.id, "table": args.table, **({"projet": args.projet} if args.projet else {})})
+    code, data = _request(
+        base_url=args.base_url,
+        path="fiche_url",
+        method="GET",
+        auth=True,
+        timeout_s=args.timeout,
+        verbose=args.verbose,
+        raw=False,
+        response_format="url",
+        params={"id": args.id, "table": args.table, **({"projet": args.projet} if args.projet else {})},
+    )
     url = ""
     if isinstance(data, dict):
         if data.get("form_url"):
@@ -424,7 +443,7 @@ def cmd_open_fiche(args: argparse.Namespace) -> None:
     if args.print_only:
         print(url)
         return
-    subprocess.check_call(["xdg-open", url])
+    _open_url(url)
     if args.format == "json":
         print(json.dumps(data, ensure_ascii=False, indent=2))
     else:
@@ -432,119 +451,6 @@ def cmd_open_fiche(args: argparse.Namespace) -> None:
 
 
 def cmd_open_list(args: argparse.Namespace) -> None:
-    code, data = _request(base_url=args.base_url, path="ask_logic", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=False, response_format="url", payload=_base_payload_from_args(args))
-    url = ""
-    if isinstance(data, dict) and data.get("_raw"):
-        url = str(data.get("_raw", "")).strip()
-    elif isinstance(data, str):
-        url = data.strip()
-    if not url:
-        _emit_output(code, data, args.format)
-        return
-    if args.print_only:
-        print(url)
-        return
-    subprocess.check_call(["xdg-open", url])
-    if args.format == "json":
-        print(json.dumps({"url": url}, ensure_ascii=False, indent=2))
-    else:
-        print(url)
-
-
-
-def cmd_prepare_ref(args: argparse.Namespace) -> None:
-    payload: dict[str, Any] = {}
-    if args.mode:
-        payload["mode"] = args.mode
-    if args.project:
-        payload["projet"] = args.project
-    if args.mode == "direct":
-        payload["table"] = args.table
-        if args.type:
-            payload["type"] = args.type
-    elif args.mode == "from-ref":
-        payload["mode"] = "from_ref"
-        payload["source_table"] = args.source_table
-        payload["id_ref"] = args.id_ref
-        payload["generation"] = args.generation
-    elif args.mode == "from-identifier":
-        payload["mode"] = "from_identifier"
-        payload["identifier_type"] = args.identifier_type
-        payload["identifier_value"] = args.identifier_value
-        if args.table:
-            payload["table"] = args.table
-        if args.type:
-            payload["type"] = args.type
-
-    fields: dict[str, Any] = {}
-    for key in ["nom", "titre", "annee", "pages", "langue", "editeur", "lieu", "url", "serie", "volume", "tomaison", "doi"]:
-        val = getattr(args, key, None)
-        if val not in (None, ""):
-            fields[key] = val
-    if fields:
-        payload["fields"] = fields
-
-    code, data = _request(
-        base_url=args.base_url,
-        path="prepare_ref",
-        method="POST",
-        auth=True,
-        timeout_s=args.timeout,
-        verbose=args.verbose,
-        raw=False,
-        response_format="url" if not args.json_only else "json",
-        payload=payload,
-    )
-
-    url = ""
-    if isinstance(data, dict):
-        if data.get("form_url"):
-            url = str(data["form_url"]).strip()
-        elif data.get("_raw"):
-            url = str(data["_raw"]).strip()
-    elif isinstance(data, str):
-        url = data.strip()
-
-    if args.json_only:
-        _emit_output(code, data, args.format)
-        return
-
-    if not url:
-        _emit_output(code, data, args.format)
-        return
-    if args.print_only:
-        print(url)
-        return
-    subprocess.check_call(["xdg-open", url])
-    if args.format == "json":
-        print(json.dumps({"url": url}, ensure_ascii=False, indent=2))
-    else:
-        print(url)
-
-def cmd_save_list(args: argparse.Namespace) -> None:
-    payload = _base_payload_from_args(args)
-    payload["nom_liste"] = args.nom_liste
-    payload["save_mode"] = args.save_mode
-    code, data = _request(base_url=args.base_url, path="save_logic", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=False, response_format=args.response_format, payload=payload)
-    if args.response_format == "url" and isinstance(data, dict) and data.get("_raw"):
-        url = str(data.get("_raw", "")).strip()
-        if args.print_only:
-            print(url)
-            return
-        subprocess.check_call(["xdg-open", url])
-        if args.format == "json":
-            print(json.dumps({"url": url}, ensure_ascii=False, indent=2))
-        else:
-            print(url)
-        return
-    _emit_output(code, data, args.format)
-
-
-def cmd_add_to_list(args: argparse.Namespace) -> None:
-    base_entry = _find_history_entry(args.base_name, previous=args.previous)
-    if base_entry is None:
-        raise SystemExit("Résultat précédent introuvable.")
-
     code, data = _request(
         base_url=args.base_url,
         path="ask_logic",
@@ -552,157 +458,40 @@ def cmd_add_to_list(args: argparse.Namespace) -> None:
         auth=True,
         timeout_s=args.timeout,
         verbose=args.verbose,
-        raw=args.raw,
-        response_format="json",
+        raw=False,
+        response_format="url",
         payload=_base_payload_from_args(args),
     )
-    if isinstance(data, dict) and isinstance(data.get("error"), dict):
+    url = ""
+    if isinstance(data, dict) and data.get("_raw"):
+        url = str(data["_raw"]).strip()
+    elif isinstance(data, str):
+        url = data.strip()
+    if not url:
         _emit_output(code, data, args.format)
-        raise SystemExit(1)
-
-    new_type, new_values = _infer_result_type(data)
-    base_type = str(base_entry.get("type", "")).strip()
-    base_values = list(base_entry.get("value") or [])
-
-    if not new_type or new_type != base_type:
-        raise SystemExit("Le type du nouveau résultat ne correspond pas à celui de la liste de base.")
-
-    merged_values = _dedupe_keep_order(base_values + new_values)
-    result_name = str(args.result_name or "").strip() or str(base_entry.get("name", "")).strip() or "liste"
-    entry = {
-        "name": result_name,
-        "type": base_type,
-        "value": merged_values,
-        "question": str(base_entry.get("question", "")).strip() or f"Liste mise à jour : {result_name}",
-        "reformulation": "",
-        "created_at": _dt.datetime.now().isoformat(timespec="seconds"),
-    }
-    _store_raw_entry(entry)
-    _emit_output(0, {"ok": True, "name": result_name, "type": base_type, "total": len(merged_values), "updated": True, "added_question": args.q}, args.format)
-
-
-def cmd_follow_links(args: argparse.Namespace) -> None:
-    base_entry = _find_history_entry(args.base_name, previous=args.previous)
-    if base_entry is None:
-        raise SystemExit("Résultat précédent introuvable.")
-
-    input_table = str(base_entry.get("type", "")).strip()
-    input_ids = list(base_entry.get("value") or [])
-    if input_table in ("", "mots_clefs", "remarques"):
-        raise SystemExit("Le résultat précédent n'est pas une liste d'entrées Thamous.")
-
-    payload = {
-        "project": getattr(args, "project", None) or getattr(args, "projet", None),
-        "input_table": input_table,
-        "input_ids": input_ids,
-        "link_type": args.link_type,
-        "from": args.from_side,
-        "to": args.to_side,
-        "output_table": args.output_table,
-    }
-
-    code, data = _request(
-        base_url=args.base_url,
-        path="follow_links",
-        method="POST",
-        auth=True,
-        timeout_s=args.timeout,
-        verbose=args.verbose,
-        raw=args.raw,
-        response_format="json",
-        payload=payload,
-    )
-    if isinstance(data, dict) and isinstance(data.get("error"), dict):
-        _emit_output(code, data, args.format)
-        raise SystemExit(1)
-
-    if isinstance(data, dict):
-        result_name = str(args.result_name or "").strip() or str(base_entry.get("name", "")).strip() or "liste"
-        entry = {
-            "name": result_name,
-            "type": str(data.get("type", "")).strip(),
-            "value": list(data.get("value") or []),
-            "question": f"{args.link_type} depuis {base_entry.get('name','liste précédente')}",
-            "reformulation": "",
-            "created_at": _dt.datetime.now().isoformat(timespec="seconds"),
-        }
-        _store_raw_entry(entry)
-        data = dict(data)
-        data["name"] = result_name
-        data["updated"] = True
-    _emit_output(code, data, args.format)
-
-
-def cmd_keywords_ref(args: argparse.Namespace) -> None:
-    payload = {
-        "project": args.project,
-        "table": args.table,
-        "id": args.id,
-        "action": args.action_name,
-        "mot_clef": args.mot_clef,
-    }
-    if args.publicite:
-        payload["publicite"] = args.publicite
-    code, data = _request(base_url=args.base_url, path="keywords_ref", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format="json", payload=payload)
-    if isinstance(data, dict) and isinstance(data.get("error"), dict):
-        _emit_output(code, data, args.format)
-        raise SystemExit(1)
-    _emit_output(code, data, args.format)
-
-
-def cmd_keywords_project(args: argparse.Namespace) -> None:
-    payload = {
-        "project": args.project,
-        "action": args.action_name,
-        "mot_clef": args.mot_clef,
-        "definition": args.definition,
-    }
-    if getattr(args, 'force', False):
-        payload["force"] = True
-    code, data = _request(base_url=args.base_url, path="keywords_project", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format="json", payload=payload)
-    if isinstance(data, dict) and isinstance(data.get("error"), dict):
-        _emit_output(code, data, args.format)
-        raise SystemExit(1)
-    _emit_output(code, data, args.format)
-
-
-def cmd_remarks_ref(args: argparse.Namespace) -> None:
-    payload = {
-        "project": args.project,
-        "table": args.table,
-        "id": args.id,
-        "action": args.action_name,
-        "remarque": args.remarque,
-    }
-    if args.publicite:
-        payload["publicite"] = args.publicite
-    code, data = _request(base_url=args.base_url, path="remarks_ref", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format="json", payload=payload)
-    if isinstance(data, dict) and isinstance(data.get("error"), dict):
-        _emit_output(code, data, args.format)
-        raise SystemExit(1)
-    _emit_output(code, data, args.format)
-
-
-def cmd_remarks_project(args: argparse.Namespace) -> None:
-    payload = {
-        "project": args.project,
-        "action": args.action_name,
-        "remarque": args.remarque,
-    }
-    if getattr(args, 'force', False):
-        payload["force"] = True
-    code, data = _request(base_url=args.base_url, path="remarks_project", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format="json", payload=payload)
-    if isinstance(data, dict) and isinstance(data.get("error"), dict):
-        _emit_output(code, data, args.format)
-        raise SystemExit(1)
-    _emit_output(code, data, args.format)
-
+        return
+    if args.print_only:
+        print(url)
+        return
+    _open_url(url)
+    if args.format == "json":
+        print(json.dumps({"url": url}, ensure_ascii=False, indent=2))
+    else:
+        print(url)
 
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--base-url", default=os.environ.get("THAMOUS_V2_BASE_URL", DEFAULT_BASE_URL), help="URL de base de l’API v2 (ou THAMOUS_V2_BASE_URL).")
+    ap.add_argument(
+        "--base-url",
+        default=os.environ.get("THAMOUS_V2_BASE_URL", DEFAULT_BASE_URL),
+        help="URL de base de l’API v2 (ou THAMOUS_V2_BASE_URL).",
+    )
     ap.add_argument("--timeout", type=int, default=45, help="Timeout HTTP en secondes.")
-    ap.add_argument("--token-file", default=os.environ.get("THAMOUS_TOKEN_FILE"), help="Chemin d’un fichier contenant le token (ou THAMOUS_TOKEN_FILE).")
+    ap.add_argument(
+        "--token-file",
+        default=os.environ.get("THAMOUS_TOKEN_FILE"),
+        help="Chemin d’un fichier contenant le token (ou THAMOUS_TOKEN_FILE).",
+    )
     ap.add_argument("--raw", action="store_true", help="Affiche la réponse brute.")
     ap.add_argument("--verbose", action="store_true", help="Logs HTTP sur stderr.")
     ap.add_argument("--response-format", default="json", choices=["json", "url"], help="Format demandé à l’API.")
@@ -711,11 +500,13 @@ def build_parser() -> argparse.ArgumentParser:
     sub = ap.add_subparsers(dest="action", required=True)
     sub.add_parser("health")
 
-    sp = sub.add_parser("login-token")
-    sp.add_argument("--login", required=True)
-    sp.add_argument("--password", required=True)
-    sp.add_argument("--write-token-file")
-    sp.add_argument("--token-only", action="store_true")
+    sp = sub.add_parser("save-token")
+    sp.add_argument("--token", required=True)
+    sp.add_argument("--token-file", default=DEFAULT_TOKEN_FILE)
+
+    sp = sub.add_parser("token-status")
+    sp.add_argument("--projet", default="perso")
+    sp.add_argument("--token-file", default=DEFAULT_TOKEN_FILE)
 
     sp = sub.add_parser("logic-context")
     sp.add_argument("--projet")
@@ -740,6 +531,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--indication")
     sp.add_argument("--feedback")
     sp.add_argument("--reformulation-precedente")
+    sp.add_argument("--limit", type=int)
     sp.add_argument("--offset", type=int)
     sp.add_argument("--order1")
     sp.add_argument("--order2")
@@ -747,102 +539,6 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--asc-desc2", dest="asc_desc2")
     sp.add_argument("--derive-limit", type=int, dest="derive_limit")
     sp.add_argument("--print-only", action="store_true", help="Retourner l'URL sans lancer le navigateur.")
-
-    sp = sub.add_parser("prepare-ref")
-    sp.add_argument("--mode", required=True, choices=["direct", "from-ref", "from-identifier"])
-    sp.add_argument("--project")
-    sp.add_argument("--table")
-    sp.add_argument("--type")
-    sp.add_argument("--source-table")
-    sp.add_argument("--id-ref", dest="id_ref", type=int)
-    sp.add_argument("--generation")
-    sp.add_argument("--identifier-type", dest="identifier_type", choices=["doi", "isbn"])
-    sp.add_argument("--identifier-value", dest="identifier_value")
-    sp.add_argument("--nom")
-    sp.add_argument("--titre")
-    sp.add_argument("--annee")
-    sp.add_argument("--pages")
-    sp.add_argument("--langue")
-    sp.add_argument("--editeur")
-    sp.add_argument("--lieu")
-    sp.add_argument("--url")
-    sp.add_argument("--serie")
-    sp.add_argument("--volume")
-    sp.add_argument("--tomaison")
-    sp.add_argument("--doi")
-    sp.add_argument("--print-only", action="store_true", help="Retourner l'URL sans lancer le navigateur.")
-    sp.add_argument("--json-only", action="store_true", help="Demander et afficher la réponse JSON complète sans ouvrir le formulaire.")
-
-    sp = sub.add_parser("save-list")
-    sp.add_argument("--q", required=True)
-    sp.add_argument("--nom-liste", required=True)
-    sp.add_argument("--save-mode", default="extension", choices=["extension", "comprehension"])
-    sp.add_argument("--project")
-    sp.add_argument("--provider")
-    sp.add_argument("--model")
-    sp.add_argument("--trace", action="store_true")
-    sp.add_argument("--indication")
-    sp.add_argument("--feedback")
-    sp.add_argument("--reformulation-precedente")
-    sp.add_argument("--offset", type=int)
-    sp.add_argument("--order1")
-    sp.add_argument("--order2")
-    sp.add_argument("--asc-desc1", dest="asc_desc1")
-    sp.add_argument("--asc-desc2", dest="asc_desc2")
-    sp.add_argument("--derive-limit", type=int, dest="derive_limit")
-    sp.add_argument("--print-only", action="store_true", help="Retourner l'URL sans lancer le navigateur quand --response-format=url.")
-
-    sp = sub.add_parser("add-to-list")
-    sp.add_argument("--q", required=True)
-    sp.add_argument("--base-name")
-    sp.add_argument("--previous", action="store_true")
-    sp.add_argument("--result-name", dest="result_name")
-    sp.add_argument("--project")
-    sp.add_argument("--provider")
-    sp.add_argument("--model")
-    sp.add_argument("--trace", action="store_true")
-    sp.add_argument("--indication")
-    sp.add_argument("--feedback")
-    sp.add_argument("--reformulation-precedente")
-
-    sp = sub.add_parser("follow-links")
-    sp.add_argument("--link-type", required=True)
-    sp.add_argument("--from", dest="from_side", required=True, choices=["source", "but"])
-    sp.add_argument("--to", dest="to_side", required=True, choices=["source", "but"])
-    sp.add_argument("--output-table", required=True)
-    sp.add_argument("--base-name")
-    sp.add_argument("--previous", action="store_true")
-    sp.add_argument("--result-name", dest="result_name")
-    sp.add_argument("--project")
-
-    sp = sub.add_parser("keywords-ref")
-    sp.add_argument("--id", required=True, type=int)
-    sp.add_argument("--table", required=True)
-    sp.add_argument("--project", required=True)
-    sp.add_argument("--action", dest="action_name", required=True, choices=["add", "remove"])
-    sp.add_argument("--mot-clef", dest="mot_clef", required=True)
-    sp.add_argument("--publicite")
-
-    sp = sub.add_parser("keywords-project")
-    sp.add_argument("--project", required=True)
-    sp.add_argument("--action", dest="action_name", required=True, choices=["add", "remove"])
-    sp.add_argument("--mot-clef", dest="mot_clef", required=True)
-    sp.add_argument("--definition")
-    sp.add_argument("--force", action="store_true")
-
-    sp = sub.add_parser("remarks-ref")
-    sp.add_argument("--id", required=True, type=int)
-    sp.add_argument("--table", required=True)
-    sp.add_argument("--project", required=True)
-    sp.add_argument("--action", dest="action_name", required=True, choices=["add", "remove"])
-    sp.add_argument("--remarque", required=True)
-    sp.add_argument("--publicite")
-
-    sp = sub.add_parser("remarks-project")
-    sp.add_argument("--project", required=True)
-    sp.add_argument("--action", dest="action_name", required=True, choices=["add", "remove"])
-    sp.add_argument("--remarque", required=True)
-    sp.add_argument("--force", action="store_true")
 
     for name in ["text-to-structure", "ask-logic"]:
         sp = sub.add_parser(name)
@@ -854,9 +550,8 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--indication")
         sp.add_argument("--feedback")
         sp.add_argument("--reformulation-precedente")
-        sp.add_argument("--result-name", dest="result_name")
-        sp.add_argument("--no-history", action="store_true")
         if name == "ask-logic":
+            sp.add_argument("--limit", type=int)
             sp.add_argument("--offset", type=int)
             sp.add_argument("--order1")
             sp.add_argument("--order2")
@@ -869,8 +564,6 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--payload-file")
         sp.add_argument("--payload-json")
 
-    sub.add_parser("history")
-
     return ap
 
 
@@ -881,21 +574,62 @@ def main() -> None:
     if args.token_file:
         os.environ["THAMOUS_TOKEN_FILE"] = args.token_file
 
-    if args.action == "health":
-        code, data = _request(base_url=args.base_url, path="health", method="GET", auth=False, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format)
-    elif args.action == "login-token":
-        cmd_login_token(args)
+    if args.action == "save-token":
+        cmd_save_token(args)
         return
+    elif args.action == "token-status":
+        cmd_token_status(args)
+        return
+    elif args.action == "health":
+        code, data = _request(
+            base_url=args.base_url,
+            path="health",
+            method="GET",
+            auth=False,
+            timeout_s=args.timeout,
+            verbose=args.verbose,
+            raw=args.raw,
+            response_format=args.response_format,
+        )
     elif args.action == "logic-context":
         params = {}
         if args.projet:
             params["projet"] = args.projet
-        code, data = _request(base_url=args.base_url, path="logic_context", method="GET", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format, params=params)
+        code, data = _request(
+            base_url=args.base_url,
+            path="logic_context",
+            method="GET",
+            auth=True,
+            timeout_s=args.timeout,
+            verbose=args.verbose,
+            raw=args.raw,
+            response_format=args.response_format,
+            params=params,
+        )
     elif args.action == "text-to-structure":
-        code, data = _request(base_url=args.base_url, path="text_to_structure", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format, payload=_base_payload_from_args(args))
+        code, data = _request(
+            base_url=args.base_url,
+            path="text_to_structure",
+            method="POST",
+            auth=True,
+            timeout_s=args.timeout,
+            verbose=args.verbose,
+            raw=args.raw,
+            response_format=args.response_format,
+            payload=_base_payload_from_args(args),
+        )
     elif args.action == "ask-logic":
-        code, data = _request(base_url=args.base_url, path="ask_logic", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format, payload=_base_payload_from_args(args))
-        _maybe_store_history(args, data)
+        code, data = _request(
+            base_url=args.base_url,
+            path="ask_logic",
+            method="POST",
+            auth=True,
+            timeout_s=args.timeout,
+            verbose=args.verbose,
+            raw=args.raw,
+            response_format=args.response_format,
+            payload=_base_payload_from_args(args),
+        )
     elif args.action == "fiche-url":
         cmd_fiche_url(args)
         return
@@ -905,43 +639,52 @@ def main() -> None:
     elif args.action == "open-list":
         cmd_open_list(args)
         return
-    elif args.action == "prepare-ref":
-        cmd_prepare_ref(args)
-        return
-    elif args.action == "save-list":
-        cmd_save_list(args)
-        return
-    elif args.action == "add-to-list":
-        cmd_add_to_list(args)
-        return
-    elif args.action == "follow-links":
-        cmd_follow_links(args)
-        return
-    elif args.action == "keywords-ref":
-        cmd_keywords_ref(args)
-        return
-    elif args.action == "keywords-project":
-        cmd_keywords_project(args)
-        return
-    elif args.action == "remarks-ref":
-        cmd_remarks_ref(args)
-        return
-    elif args.action == "remarks-project":
-        cmd_remarks_project(args)
-        return
     elif args.action == "compile-logic":
-        code, data = _request(base_url=args.base_url, path="compile_logic", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format, payload=_load_json_from_args(args.payload_file, args.payload_json))
+        code, data = _request(
+            base_url=args.base_url,
+            path="compile_logic",
+            method="POST",
+            auth=True,
+            timeout_s=args.timeout,
+            verbose=args.verbose,
+            raw=args.raw,
+            response_format=args.response_format,
+            payload=_load_json_from_args(args.payload_file, args.payload_json),
+        )
     elif args.action == "search-logic":
-        code, data = _request(base_url=args.base_url, path="search_logic", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format, payload=_load_json_from_args(args.payload_file, args.payload_json))
-    elif args.action == "history":
-        _emit_output(0, {"results": _load_history(), "total": len(_load_history())}, args.format)
-        return
+        code, data = _request(
+            base_url=args.base_url,
+            path="search_logic",
+            method="POST",
+            auth=True,
+            timeout_s=args.timeout,
+            verbose=args.verbose,
+            raw=args.raw,
+            response_format=args.response_format,
+            payload=_load_json_from_args(args.payload_file, args.payload_json),
+        )
     elif args.action == "replay-logic":
-        code, data = _request(base_url=args.base_url, path="replay_logic", method="POST", auth=True, timeout_s=args.timeout, verbose=args.verbose, raw=args.raw, response_format=args.response_format, payload=_load_json_from_args(args.payload_file, args.payload_json))
+        code, data = _request(
+            base_url=args.base_url,
+            path="replay_logic",
+            method="POST",
+            auth=True,
+            timeout_s=args.timeout,
+            verbose=args.verbose,
+            raw=args.raw,
+            response_format=args.response_format,
+            payload=_load_json_from_args(args.payload_file, args.payload_json),
+        )
     else:
         raise SystemExit(f"Action inconnue: {args.action}")
 
     if isinstance(data, dict) and isinstance(data.get("error"), dict):
+        err = data["error"]
+        code_str = str(err.get("code") or "")
+        msg = str(err.get("message") or "")
+        if code_str == "UNAUTHORIZED" and msg in {"Invalid token", "Missing token"}:
+            print(json.dumps({"error": err, "help": _token_help_message()}, ensure_ascii=False, indent=2))
+            raise SystemExit(1)
         _emit_output(code, data, args.format)
         raise SystemExit(1)
 
