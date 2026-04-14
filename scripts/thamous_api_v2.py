@@ -870,6 +870,24 @@ def cmd_open_list(args: argparse.Namespace) -> None:
     else:
         print(url)
 
+
+def cmd_project_keywords(args: argparse.Namespace) -> None:
+    params = {}
+    if args.project:
+        params['project'] = args.project
+    code, data = _request(
+        base_url=args.base_url,
+        path='keywords_project',
+        method='GET',
+        auth=True,
+        timeout_s=args.timeout,
+        verbose=args.verbose,
+        raw=args.raw,
+        response_format=args.response_format,
+        params=params,
+    )
+    _emit_output(code, data, args.format)
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser()
     ap.add_argument(
@@ -939,6 +957,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("token-status")
     sp.add_argument("--projet", default="perso")
     sp.add_argument("--token-file", default=DEFAULT_TOKEN_FILE)
+
+    sp = sub.add_parser("project-keywords")
+    sp.add_argument("--project")
 
     sp = sub.add_parser("logic-context")
     sp.add_argument("--projet")
@@ -1015,6 +1036,9 @@ def main() -> None:
         return
     elif args.action == "history":
         cmd_history(args)
+        return
+    elif args.action == "project-keywords":
+        cmd_project_keywords(args)
         return
     elif args.action == "add-to-list":
         cmd_add_to_list(args)
