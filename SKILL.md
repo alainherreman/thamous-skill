@@ -297,6 +297,8 @@ Toute demande à l’API doit préciser un **format de sortie demandé** :
 - Préférer `add-to-list` quand l’utilisateur veut enrichir une liste précédente.
 - Préférer `follow-links` quand l’utilisateur veut appliquer un type de lien à une liste précédente.
 - Si le nom de liste manque, le demander.
+- Préférer `refs-by-keyword` quand l’utilisateur demande explicitement une liste d’ids pour une table, un projet et un mot-clef.
+- Préférer `project-keywords` quand l’utilisateur demande simplement la liste des mots-clefs d’un projet.
 - Préférer `text-to-structure --trace` quand il faut diagnostiquer la compréhension.
 - Après 3 rétroactions/corrections infructueuses, arrêter la correction locale et demander à l'utilisateur de décomposer la demande en étapes plus simples.
 - Utiliser `compile-logic` ou `replay-logic` quand on a déjà un JSON et qu’on veut isoler le problème sans relancer le LLM.

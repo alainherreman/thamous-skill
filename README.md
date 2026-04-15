@@ -46,6 +46,8 @@ Les résultats de `ask-logic` peuvent être stockés localement :
 
 Commandes utiles :
 - `python3 scripts/thamous_api_v2.py --format table history`
+- `python3 scripts/thamous_api_v2.py project-keywords --project HilbertGG`
+- `python3 scripts/thamous_api_v2.py refs-by-keyword --project HilbertGG --table tbiblio --mot-clef "Axiome Archimède"`
 - `python3 scripts/thamous_api_v2.py add-to-list --previous --q "..." --project ... --provider ... --model ...`
 - `python3 scripts/thamous_api_v2.py follow-links --previous --link-type Cite --from source --to but --output-table tbiblio --project ...`
 
