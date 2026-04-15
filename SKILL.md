@@ -70,6 +70,10 @@ Il ne doit pas inventer ce nom.
 
 ## Historique local des résultats
 
+L’historique n’est pas un simple journal : c’est un **mécanisme général de reprise contextuelle**.
+
+### 1. Stockage
+
 - les résultats utiles sont stockés localement dans un historique ;
 - chaque résultat stocké a :
   - un `name`
@@ -81,15 +85,50 @@ Il ne doit pas inventer ce nom.
   - `remarques` avec une liste de chaînes
 - la skill peut afficher cet historique via la commande `history`
 - le stockage est local ; il ne dépend pas de l'API
+
+### 2. Résolution des références à un résultat précédent
+
+Quand l’utilisateur emploie une expression anaphorique comme :
+- **`la liste précédente`**
+- **`les références précédentes`**
+- **`le résultat précédent`**
+- **`la liste antérieure`**
+- ou une formulation équivalente,
+
+la skill ne doit pas traiter cela comme une nouvelle recherche autonome.
+Elle doit d’abord **résoudre localement** cette expression vers un résultat déjà stocké.
+
+### 3. Règle de compatibilité
+
+- si l’action attend une **liste de références** ou une **liste d’ids**, la skill doit chercher dans l’historique le dernier résultat compatible de type table Thamous avec liste d’ids ;
+- si l’action attend un autre type de résultat, la skill doit chercher le dernier résultat compatible avec ce type ;
+- elle ne doit pas sélectionner un résultat incompatible juste parce qu’il est le plus récent.
+
+### 4. Priorité de résolution
+
+Ordre de priorité :
+1. un résultat explicitement nommé par l’utilisateur ;
+2. sinon le dernier résultat local compatible ;
+3. sinon échec explicite.
+
+Donc :
+- `--base-name NOM` a priorité sur `--previous` ;
+- sans nom explicite, la skill doit prendre le dernier résultat compatible, pas le dernier résultat arbitraire.
+
+### 5. Opérations utilisant ce mécanisme
+
 - pour ajouter un nouveau résultat à une liste stockée :
   - `add-to-list --previous --q "..."`
   - ou `add-to-list --base-name NOM --q "..."`
 - pour suivre un type de lien à partir d'une liste stockée :
   - `follow-links --previous --link-type Cite --from source --to but --output-table tbiblio`
   - ou `follow-links --base-name NOM --link-type Cite --from source --to but --output-table tbiblio`
-- ces opérations modifient la liste existante sauf si un autre nom est explicitement demandé
-- la `liste précédente` désigne le dernier résultat local dont le type est une table Thamous avec une liste d'ids
-- si l'utilisateur dit **`la liste précédente`**, **`la liste antérieure`**, **`le résultat précédent`** ou une formulation équivalente, la skill doit comprendre qu'il faut utiliser ce dernier résultat local compatible
+- ces opérations modifient la liste existante sauf si un autre nom est explicitement demandé.
+
+### 6. Règle d’échec
+
+- si aucun antécédent compatible n’existe dans l’historique, la skill doit le dire explicitement ;
+- elle ne doit ni improviser un autre antécédent, ni relancer une recherche vague à la place.
 
 ## Revues, auteurs, et champs textuels
 

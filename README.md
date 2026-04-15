@@ -40,6 +40,8 @@ Si une demande ne correspond pas à l’une de ces actions, la skill doit le dir
 
 ## Historique local
 
+L’historique local sert aussi à résoudre les références au **résultat précédent**.
+
 Les résultats de `ask-logic` peuvent être stockés localement :
 - avec un nom automatique ;
 - ou avec `--result-name`.
@@ -51,8 +53,11 @@ Commandes utiles :
 - `python3 scripts/thamous_api_v2.py add-to-list --previous --q "..." --project ... --provider ... --model ...`
 - `python3 scripts/thamous_api_v2.py follow-links --previous --link-type Cite --from source --to but --output-table tbiblio --project ...`
 
-Par défaut, `add-to-list` et `follow-links` réutilisent la liste locale précédente compatible.
-La “liste précédente” est le dernier résultat local dont le type est une table Thamous avec une liste d’ids.
+Règle générale :
+- une expression comme `la liste précédente`, `les références précédentes`, `le résultat précédent` ou une formulation équivalente doit être résolue **localement** dans l’historique ;
+- la skill doit choisir le **dernier résultat compatible**, pas simplement le dernier résultat quelconque ;
+- un résultat nommé explicitement a priorité ;
+- si aucun antécédent compatible n’existe, la skill doit le dire explicitement.
 
 ## Traductions
 
