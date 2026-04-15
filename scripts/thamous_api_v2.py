@@ -888,6 +888,27 @@ def cmd_project_keywords(args: argparse.Namespace) -> None:
     )
     _emit_output(code, data, args.format)
 
+
+def cmd_refs_by_keyword(args: argparse.Namespace) -> None:
+    params = {
+        'table': args.table,
+        'mot_clef': args.mot_clef,
+    }
+    if args.project:
+        params['project'] = args.project
+    code, data = _request(
+        base_url=args.base_url,
+        path='refs_by_keyword',
+        method='GET',
+        auth=True,
+        timeout_s=args.timeout,
+        verbose=args.verbose,
+        raw=args.raw,
+        response_format=args.response_format,
+        params=params,
+    )
+    _emit_output(code, data, args.format)
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser()
     ap.add_argument(
@@ -960,6 +981,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = sub.add_parser("project-keywords")
     sp.add_argument("--project")
+
+    sp = sub.add_parser("refs-by-keyword")
+    sp.add_argument("--project")
+    sp.add_argument("--table", required=True)
+    sp.add_argument("--mot-clef", dest="mot_clef", required=True)
 
     sp = sub.add_parser("logic-context")
     sp.add_argument("--projet")
@@ -1039,6 +1065,9 @@ def main() -> None:
         return
     elif args.action == "project-keywords":
         cmd_project_keywords(args)
+        return
+    elif args.action == "refs-by-keyword":
+        cmd_refs_by_keyword(args)
         return
     elif args.action == "add-to-list":
         cmd_add_to_list(args)
