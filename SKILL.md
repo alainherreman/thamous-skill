@@ -202,7 +202,7 @@ Pour cette skill, il faut aligner la règle métier et la mécanique technique :
    - utiliser le wrapper canonique du système (`bin/thamous-v2`, `bin\\thamous-v2.cmd` ou `bin/thamous-v2.ps1`) ;
    - ne pas improviser de `curl`, de `python -c`, ni de variante shell si le wrapper couvre le besoin ;
 2. **des sous-commandes canoniques**
-   - utiliser les sous-commandes réellement exposées par le client (`health`, `save-token`, `token-status`, `logic-context`, `fiche-url`, `open-fiche`, `open-list`, `text-to-structure`, `ask-logic`, `compile-logic`, `search-logic`, `replay-logic`) ;
+   - utiliser les sous-commandes réellement exposées par le client (`health`, `save-token`, `save-credentials`, `login`, `token-status`, `logic-context`, `fiche-url`, `open-fiche`, `open-list`, `text-to-structure`, `ask-logic`, `compile-logic`, `search-logic`, `replay-logic`) ;
 3. **une discipline d’approbation**
    - pour l’usage standard de la skill, ne pas passer par `require_escalated` ;
    - ne pas changer de forme de commande juste pour “faire plus riche” ;
@@ -221,27 +221,26 @@ Conséquence pratique : le wrapper canonique du système est l’entrée normale
 
 ### Obtenir les accès
 
-- **Token Thamous** :
-  - procédure simple recommandée :
-    1. récupérer le **token partagé stable** déjà utilisé par vos autres clients Thamous
-    2. l’enregistrer localement avec :
-       - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py save-token --token VOTRE_TOKEN`
-       - le token est alors stocké par défaut dans `~/.config/thamous/token`
-       - les commandes normales de la skill le relisent automatiquement à cet emplacement
-  - vérifier ensuite avec :
-    - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py token-status`
-  - si `token-status` renvoie `expired_or_invalid`, il faut d’abord vérifier que la skill utilise bien le même token partagé que les autres clients.
-  - côté serveur, l’API v2 accepte maintenant de nouveau correctement `Authorization: Bearer ...` ; le client conserve aussi ses autres modes compatibles.
+- **Compte Thamous** :
+  - l’utilisateur enregistre une fois ses identifiants :
+    - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 save-credentials --login VOTRE_LOGIN`
+  - puis vérifie avec :
+    - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 token-status`
+  - le client récupère automatiquement un token via `login_token`, le stocke localement et le renouvelle automatiquement si nécessaire.
 - **Clé API fournisseur** : dans Thamous, ouvrir le menu `LLM`, enregistrer une clé API pour le fournisseur voulu, puis choisir un modèle. Cette clé reste enregistrée dans Thamous pour le compte utilisateur.
 
 ### Important
 
 La skill peut être chargée sans erreur même si ces accès ne sont pas encore configurés, mais elle ne peut pas être utilisée réellement sans :
 
-- un token Thamous ;
+- un compte Thamous valide ;
 - une clé API fournisseur LLM.
 
-Bitwarden peut être utilisé pour fournir le token Thamous partagé, mais ce n'est qu'une possibilité parmi d'autres.
+Un token déjà présent peut encore être utilisé en secours, mais ce n’est plus le mode normal pour les utilisateurs.
+
+## Exemples représentatifs et tests
+
+Voir `references/exemples-tests-v2.md`.
 
 ## Endpoints utiles
 
@@ -269,52 +268,40 @@ Toute demande à l’API doit préciser un **format de sortie demandé** :
 
 ## Recettes minimales
 
+Les exemples complets et les tests représentatifs sont rassemblés dans `references/exemples-tests-v2.md`.
+
+Rappel rapide des usages essentiels :
+
+- Première configuration :
+  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 save-credentials --login VOTRE_LOGIN`
+  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 token-status`
+
 - Santé :
-  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py health`
-
-- Enregistrer un token récupéré depuis le site :
-  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py save-token --token VOTRE_TOKEN`
-
-- Vérifier si le token local est valide ou expiré :
-  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py token-status`
+  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 health`
 
 - Contexte logique :
-  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py logic-context --projet HilbertGG`
-
-- Texte -> résultats :
-  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py ask-logic --q "Les livres de Klein traduits en anglais"`
-  - la skill affiche alors aussi un nom de résultat sur stderr, par ex. `[result_name] ...`
+  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 logic-context --projet HilbertGG`
 
 - Voir l'historique local :
-  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py --format table history`
+  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 --format table history`
 
 - Ouvrir une fiche :
-  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py open-fiche --table tbiblio --id 1442`
+  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 open-fiche --table tbiblio --id 1442`
 
 - Ouvrir une liste :
-  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py open-list --q "Les livres de Klein traduits en anglais" --project perso --provider OpenAI --model GPT-5.2`
+  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 open-list --q "Les livres de Klein traduits en anglais" --project perso --provider xAI --model "Grok 4"`
 
-- Préparer une nouvelle référence directe :
-  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py prepare-ref --mode direct --table tbiblio --type Article --project HilbertGG --nom "Poincaré, Henri" --titre "Titre à compléter" --annee 1900`
+- Obtenir une structure logique :
+  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 text-to-structure --q "Les articles en espagnol sur Hilbert" --project HilbertGG --provider xAI --model "Grok 4"`
 
-- Préparer une nouvelle référence à partir d'une référence existante :
-  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py prepare-ref --mode from-ref --source-table tbiblio --id-ref 1442 --generation meme_auteur_article --project HilbertGG`
+- Recherche logique avec stockage local :
+  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 ask-logic --q "Les livres de Klein traduits en anglais" --project HilbertGG --provider xAI --model "Grok 4" --result-name klein_traduits`
 
-- Règle importante sur le champ `url` :
-  - ne remplir `url` que s'il s'agit d'un lien permettant d'accéder au texte lui-même ;
-  - ne pas y mettre une simple page de métadonnées (OpenLibrary, Crossref, catalogue, etc.).
-
-- Préparer une référence à partir d'un DOI ou d'un ISBN :
-  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py prepare-ref --mode from-identifier --identifier-type doi --identifier-value 10.2307/1968337 --project HilbertGG`
-
-- Enregistrer une liste en extension :
-  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py save-list --q "Les livres de Klein traduits en anglais" --nom-liste "Klein traduits en anglais" --save-mode extension --project perso --provider OpenAI --model GPT-5.2`
-
-- Enregistrer une liste en compréhension :
-  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py save-list --q "Les livres de Klein traduits en anglais" --nom-liste "Klein traduits en anglais" --save-mode comprehension --project perso --provider OpenAI --model GPT-5.2`
+- Ajouter à la liste précédente :
+  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 add-to-list --previous --q "les éditions françaises" --project HilbertGG --provider xAI --model "Grok 4"`
 
 - Suivre un lien depuis la liste précédente :
-  - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py follow-links --previous --link-type Cite --from source --to but --output-table tbiblio --project HilbertGG`
+  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 follow-links --previous --link-type Cite --from source --to but --output-table tbiblio --project HilbertGG`
 
 ## Règle de robustesse
 
