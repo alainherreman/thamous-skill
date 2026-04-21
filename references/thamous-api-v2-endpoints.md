@@ -10,11 +10,12 @@
 - `login_token` : sans Bearer token, avec `login` + `password`
 - le reste : Bearer token
 
-Le client lit, dans cet ordre :
+Le client utilise en pratique, dans cet ordre :
 
-1. `THAMOUS_TOKEN`
-2. `THAMOUS_TOKEN_FILE`
-3. Bitwarden (`bw get item ...`)
+1. un token déjà présent (`THAMOUS_TOKEN`, `THAMOUS_API_TOKEN`, fichier local, Bitwarden) ;
+2. sinon les identifiants utilisateur (`--login` / `--password`, `THAMOUS_LOGIN` / `THAMOUS_PASSWORD`, ou fichier local d’identifiants) ;
+3. avec ces identifiants, il appelle `login_token` puis stocke localement le token obtenu ;
+4. si ce token devient invalide, il le renouvelle automatiquement.
 
 ## Formats de sortie
 
@@ -50,6 +51,8 @@ Entrée :
 
 Retourne :
 - `token`
+- `token_type`
+- `expires_in` / `expires_at`
 - `signature`
 - `login`
 - `nom`

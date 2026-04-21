@@ -216,23 +216,21 @@ Conséquence pratique : le wrapper canonique du système est l’entrée normale
 - Python 3
 - `requests`
 - pour utiliser réellement la skill :
-  - un **token Thamous**
+  - un **compte Thamous** (login + mot de passe)
   - une **clé API fournisseur LLM**
 
 ### Obtenir les accès
 
 - **Token Thamous** :
   - procédure simple recommandée :
-    1. se connecter sur `https://thamous.ouvaton.org/thamous/`
-    2. ouvrir `https://thamous.ouvaton.org/thamous/php/ajax_get_api_token.php`
-    3. copier la valeur `token`
-    4. l’enregistrer localement avec :
+    1. récupérer le **token partagé stable** déjà utilisé par vos autres clients Thamous
+    2. l’enregistrer localement avec :
        - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py save-token --token VOTRE_TOKEN`
        - le token est alors stocké par défaut dans `~/.config/thamous/token`
        - les commandes normales de la skill le relisent automatiquement à cet emplacement
   - vérifier ensuite avec :
     - `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py token-status`
-  - si `token-status` renvoie `expired_or_invalid`, il faut simplement régénérer un nouveau token par la même procédure.
+  - si `token-status` renvoie `expired_or_invalid`, il faut d’abord vérifier que la skill utilise bien le même token partagé que les autres clients.
   - côté serveur, l’API v2 accepte maintenant de nouveau correctement `Authorization: Bearer ...` ; le client conserve aussi ses autres modes compatibles.
 - **Clé API fournisseur** : dans Thamous, ouvrir le menu `LLM`, enregistrer une clé API pour le fournisseur voulu, puis choisir un modèle. Cette clé reste enregistrée dans Thamous pour le compte utilisateur.
 
@@ -243,7 +241,7 @@ La skill peut être chargée sans erreur même si ces accès ne sont pas encore 
 - un token Thamous ;
 - une clé API fournisseur LLM.
 
-Bitwarden peut être utilisé pour fournir le token Thamous, mais ce n'est qu'une possibilité parmi d'autres.
+Bitwarden peut être utilisé pour fournir le token Thamous partagé, mais ce n'est qu'une possibilité parmi d'autres.
 
 ## Endpoints utiles
 

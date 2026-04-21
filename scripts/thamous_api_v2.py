@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import getpass
 import json
 import os
 import pathlib
@@ -18,9 +19,224 @@ from typing import Any, Iterable
 import requests
 
 DEFAULT_BASE_URL = "https://thamous.ouvaton.org/thamous/php/api/v2/index.php"
-DEFAULT_BW_ITEM_NAME = "Al1 - Thamous API Token"
+DEFAULT_BW_ITEM_NAME = "Thamous API Token"
 DEFAULT_TOKEN_FILE = os.path.expanduser("~/.config/thamous/token")
+DEFAULT_CREDENTIALS_FILE = os.path.expanduser("~/.config/thamous/credentials.json")
 DEFAULT_HISTORY_FILE = os.path.expanduser("~/.config/thamous/history_v2.jsonl")
+
+
+def _env_token() -> tuple[str, str] | None:
+    for name in ("THAMOUS_TOKEN", "THAMOUS_API_TOKEN"):
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value, f"env:{name}"
+    return None
+
+
+def _token_file_path(explicit: str | None = None) -> str:
+    return os.path.expanduser(
+        explicit
+        or os.environ.get("THAMOUS_TOKEN_FILE")
+        or os.environ.get("THAMOUS_API_TOKEN_FILE")
+        or DEFAULT_TOKEN_FILE
+    )
+
+
+def _credentials_file_path(explicit: str | None = None) -> str:
+    return os.path.expanduser(
+        explicit
+        or os.environ.get("THAMOUS_CREDENTIALS_FILE")
+        or DEFAULT_CREDENTIALS_FILE
+    )
+
+
+def _write_text_file(path: str, value: str) -> None:
+    _ensure_parent_dir(path)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(value)
+    try:
+        os.chmod(path, 0o600)
+    except Exception:
+        pass
+
+
+def _read_json_file(path: str) -> dict[str, Any]:
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return data if isinstance(data, dict) else {}
+
+
+def _write_json_file(path: str, data: dict[str, Any]) -> None:
+    _ensure_parent_dir(path)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    try:
+        os.chmod(path, 0o600)
+    except Exception:
+        pass
+
+
+def _env_credentials() -> tuple[str, str] | None:
+    login = os.environ.get("THAMOUS_LOGIN", "").strip()
+    password = os.environ.get("THAMOUS_PASSWORD", "")
+    if login and password:
+        return login, password
+    return None
+
+
+def _load_saved_credentials(path: str) -> tuple[str, str] | None:
+    if not os.path.exists(path):
+        return None
+    try:
+        data = _read_json_file(path)
+    except Exception:
+        return None
+    login = str(data.get("login") or "").strip()
+    password = str(data.get("password") or "")
+    if login and password:
+        return login, password
+    return None
+
+
+def _resolve_credentials(args: argparse.Namespace | None = None, *, prompt_password: bool = False) -> tuple[str, str] | None:
+    explicit_login = str(getattr(args, "login", "") or "").strip() if args is not None else ""
+    explicit_password = str(getattr(args, "password", "") or "") if args is not None else ""
+    if explicit_login and explicit_password:
+        return explicit_login, explicit_password
+
+    env_creds = _env_credentials()
+    if env_creds:
+        return env_creds
+
+    creds_file = _credentials_file_path(getattr(args, "credentials_file", None) if args is not None else None)
+    saved = _load_saved_credentials(creds_file)
+    if saved:
+        if explicit_login and explicit_login != saved[0]:
+            if explicit_password:
+                return explicit_login, explicit_password
+            if prompt_password and sys.stdin.isatty():
+                return explicit_login, getpass.getpass("Mot de passe Thamous: ")
+        return saved
+
+    if explicit_login:
+        if explicit_password:
+            return explicit_login, explicit_password
+        if prompt_password and sys.stdin.isatty():
+            return explicit_login, getpass.getpass("Mot de passe Thamous: ")
+
+    return None
+
+
+def _login_token_request(*, base_url: str, login: str, password: str, timeout_s: int, verbose: bool, ttl: int = 86400) -> dict[str, Any]:
+    started = time.time()
+    try:
+        response = requests.post(
+            f"{base_url}?path=login_token",
+            headers={"Content-Type": "application/json; charset=utf-8"},
+            data=json.dumps({"login": login, "password": password, "app": "thamous-api-v2", "ttl": ttl}, ensure_ascii=False).encode("utf-8"),
+            timeout=timeout_s,
+        )
+    except requests.RequestException as exc:
+        raise SystemExit(f"Échec de connexion à login_token: {exc}") from exc
+
+    elapsed_ms = int((time.time() - started) * 1000)
+    if verbose:
+        ts = _dt.datetime.now().isoformat(timespec="seconds")
+        print(f"[{ts}] POST {base_url}?path=login_token -> {response.status_code} ({elapsed_ms}ms)", file=sys.stderr)
+
+    try:
+        data = response.json()
+    except Exception:
+        raise SystemExit("Réponse non JSON de login_token.")
+    if not response.ok or (isinstance(data, dict) and isinstance(data.get("error"), dict)):
+        err = data.get("error") if isinstance(data, dict) else None
+        if isinstance(err, dict):
+            raise SystemExit(f"Échec d’authentification Thamous: {err.get('message') or err.get('code') or 'erreur'}")
+        raise SystemExit("Échec d’authentification Thamous.")
+    if not isinstance(data, dict) or not str(data.get("token") or "").strip():
+        raise SystemExit("login_token n’a pas renvoyé de token exploitable.")
+    return data
+
+
+def _refresh_token_from_credentials(args: argparse.Namespace, *, save_token: bool = True, prompt_password: bool = False) -> dict[str, Any]:
+    creds = _resolve_credentials(args, prompt_password=prompt_password)
+    if not creds:
+        raise SystemExit(
+            "Authentification Thamous manquante. Fournissez --login et --password, "
+            "ou enregistrez-les avec save-credentials."
+        )
+    login, password = creds
+    data = _login_token_request(
+        base_url=args.base_url,
+        login=login,
+        password=password,
+        timeout_s=args.timeout,
+        verbose=args.verbose,
+    )
+    token = str(data.get("token") or "").strip()
+    if save_token:
+        _write_text_file(_token_file_path(getattr(args, "token_file", None)), token)
+    return data
+
+
+def _auth_error(data: Any) -> tuple[str, str] | None:
+    if not isinstance(data, dict):
+        return None
+    err = data.get("error")
+    if not isinstance(err, dict):
+        return None
+    return str(err.get("code") or ""), str(err.get("message") or "")
+
+
+def _is_invalid_token_error(data: Any) -> bool:
+    err = _auth_error(data)
+    if not err:
+        return False
+    code, message = err
+    return code == "UNAUTHORIZED" and message in {"Invalid token", "Missing token"}
+
+
+def _read_token_from_sources(args: argparse.Namespace | None = None) -> tuple[str, str] | None:
+    env_token = _env_token()
+    if env_token:
+        return env_token[0], env_token[1]
+
+    tok_file = _token_file_path(getattr(args, "token_file", None) if args is not None else None)
+    if tok_file:
+        try:
+            return _read_text_file(tok_file).strip(), tok_file
+        except Exception:
+            pass
+
+    try:
+        bw_item_name = os.environ.get("THAMOUS_BW_ITEM", DEFAULT_BW_ITEM_NAME)
+        out = subprocess.check_output(["bw", "get", "item", bw_item_name], stderr=subprocess.DEVNULL)
+        item = json.loads(out.decode("utf-8"))
+        notes = (item.get("notes") or "").strip()
+        if notes:
+            return notes, f"bitwarden:{bw_item_name}"
+        wanted_field = os.environ.get("THAMOUS_BW_FIELD", "token").strip().lower()
+        fields = item.get("fields") or []
+        if isinstance(fields, list):
+            for fld in fields:
+                if not isinstance(fld, dict):
+                    continue
+                name = (fld.get("name") or "").strip().lower()
+                if name == wanted_field:
+                    val = (fld.get("value") or "").strip()
+                    if val:
+                        return val, f"bitwarden:{bw_item_name}"
+            for fld in fields:
+                if not isinstance(fld, dict):
+                    continue
+                name = (fld.get("name") or "").strip().lower()
+                if "token" in name:
+                    val = (fld.get("value") or "").strip()
+                    if val:
+                        return val, f"bitwarden:{bw_item_name}"
+    except Exception:
+        pass
+    return None
 
 
 def _read_text_file(path: str) -> str:
@@ -307,6 +523,7 @@ def cmd_add_to_list(args: argparse.Namespace) -> None:
         raw=args.raw,
         response_format=args.response_format,
         payload=_base_payload_from_args(args),
+        args=args,
     )
     if isinstance(data, dict) and isinstance(data.get("error"), dict):
         _emit_output(code, data, args.format)
@@ -375,6 +592,7 @@ def cmd_follow_links(args: argparse.Namespace) -> None:
         raw=args.raw,
         response_format=args.response_format,
         payload=payload,
+        args=args,
     )
     if isinstance(data, dict) and isinstance(data.get("error"), dict):
         _emit_output(code, data, args.format)
@@ -421,68 +639,29 @@ def cmd_follow_links(args: argparse.Namespace) -> None:
     )
 
 
-def get_token() -> str:
-    tok = os.environ.get("THAMOUS_TOKEN")
-    if tok:
-        return tok.strip()
-
-    tok_file = os.environ.get("THAMOUS_TOKEN_FILE") or DEFAULT_TOKEN_FILE
-    if tok_file:
-        try:
-            return _read_text_file(tok_file).strip()
-        except Exception:
-            pass
-
-    try:
-        bw_item_name = os.environ.get("THAMOUS_BW_ITEM", DEFAULT_BW_ITEM_NAME)
-        out = subprocess.check_output(["bw", "get", "item", bw_item_name], stderr=subprocess.DEVNULL)
-        item = json.loads(out.decode("utf-8"))
-        notes = (item.get("notes") or "").strip()
-        if notes:
-            return notes
-        wanted_field = os.environ.get("THAMOUS_BW_FIELD", "token").strip().lower()
-        fields = item.get("fields") or []
-        if isinstance(fields, list):
-            for fld in fields:
-                if not isinstance(fld, dict):
-                    continue
-                name = (fld.get("name") or "").strip().lower()
-                if name == wanted_field:
-                    val = (fld.get("value") or "").strip()
-                    if val:
-                        return val
-            for fld in fields:
-                if not isinstance(fld, dict):
-                    continue
-                name = (fld.get("name") or "").strip().lower()
-                if "token" in name:
-                    val = (fld.get("value") or "").strip()
-                    if val:
-                        return val
-    except Exception:
-        pass
-
+def get_token(args: argparse.Namespace | None = None, *, allow_login: bool = True) -> str:
+    source = _read_token_from_sources(args)
+    if source and source[0].strip():
+        return source[0].strip()
+    if allow_login and args is not None:
+        data = _refresh_token_from_credentials(args, save_token=True, prompt_password=False)
+        return str(data.get("token") or "").strip()
     raise SystemExit(
-        "THAMOUS_TOKEN manquant. "
-        "Enregistre-le dans ~/.config/thamous/token "
-        "ou utilise --token-file /chemin/vers/token. "
-        "Pour le régénérer depuis le web : connecte-toi à Thamous puis ouvre "
-        "https://thamous.ouvaton.org/thamous/php/ajax_get_api_token.php"
+        "Authentification Thamous manquante. Utilisez --login et --password, "
+        "ou enregistrez-les avec save-credentials."
     )
 
 
 def _token_help_message() -> str:
     return (
-        "Token Thamous invalide ou expiré.\n"
+        "Authentification Thamous invalide ou expirée.\n"
+        "Utilisez vos identifiants Thamous (login + mot de passe) ; le token sera\n"
+        "récupéré automatiquement via login_token et stocké localement.\n"
         "Procédure simple :\n"
-        "1. Se connecter sur https://thamous.ouvaton.org/thamous/\n"
-        "2. Ouvrir https://thamous.ouvaton.org/thamous/php/ajax_get_api_token.php\n"
-        "3. Copier la valeur `token`\n"
-        "4. L’enregistrer avec :\n"
-        "   python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py "
-        "save-token --token VOTRE_TOKEN\n"
-        "5. Vérifier avec :\n"
-        "   python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py token-status"
+        "1. Enregistrer vos identifiants avec :\n"
+        "   ~/.codex/skills/thamous-api-v2/bin/thamous-v2 save-credentials --login VOTRE_LOGIN\n"
+        "2. Puis utiliser normalement la commande voulue ; le token sera renouvelé\n"
+        "   automatiquement si nécessaire."
     )
 
 
@@ -547,32 +726,33 @@ def _request(
     response_format: str,
     params: dict[str, Any] | None = None,
     payload: dict[str, Any] | None = None,
+    args: argparse.Namespace | None = None,
 ) -> tuple[int, Any]:
-    headers: dict[str, str] = {}
-    token = ""
-    if auth:
-        token = get_token()
-        headers["Authorization"] = f"Bearer {token}"
-        headers["X-Authorization"] = f"Bearer {token}"
-        headers["X-Thamous-Token"] = token
-
-    started = time.time()
-    try:
+    def do_request(token: str) -> requests.Response:
+        headers: dict[str, str] = {}
+        if auth:
+            headers["Authorization"] = f"Bearer {token}"
+            headers["X-Authorization"] = f"Bearer {token}"
+            headers["X-Thamous-Token"] = token
         if method == "GET":
-            response = requests.get(
+            return requests.get(
                 base_url,
                 params={"path": path, "format": response_format, **(params or {}), **({"token": token} if auth else {})},
                 headers=headers,
                 timeout=timeout_s,
             )
-        else:
-            headers["Content-Type"] = "application/json; charset=utf-8"
-            response = requests.post(
-                f"{base_url}?path={path}",
-                headers=headers,
-                data=json.dumps({"format": response_format, **(payload or {}), **({"token": token} if auth else {})}, ensure_ascii=False).encode("utf-8"),
-                timeout=timeout_s,
-            )
+        headers["Content-Type"] = "application/json; charset=utf-8"
+        return requests.post(
+            f"{base_url}?path={path}",
+            headers=headers,
+            data=json.dumps({"format": response_format, **(payload or {}), **({"token": token} if auth else {})}, ensure_ascii=False).encode("utf-8"),
+            timeout=timeout_s,
+        )
+
+    token = get_token(args, allow_login=auth) if auth else ""
+    started = time.time()
+    try:
+        response = do_request(token)
     except requests.RequestException as exc:
         elapsed_ms = int((time.time() - started) * 1000)
         if verbose:
@@ -591,10 +771,40 @@ def _request(
     ct = (response.headers.get("content-type") or "").lower()
     if "application/json" in ct or response.text.strip().startswith("{"):
         try:
-            return response.status_code, response.json()
+            data = response.json()
         except Exception:
             return response.status_code, {"_raw": response.text}
-    return response.status_code, {"_raw": response.text, "content_type": response.headers.get("content-type")}
+    else:
+        data = {"_raw": response.text, "content_type": response.headers.get("content-type")}
+
+    if auth and _is_invalid_token_error(data) and args is not None and _resolve_credentials(args, prompt_password=False):
+        refreshed = _refresh_token_from_credentials(args, save_token=True, prompt_password=False)
+        token = str(refreshed.get("token") or "").strip()
+        started = time.time()
+        try:
+            response = do_request(token)
+        except requests.RequestException as exc:
+            elapsed_ms = int((time.time() - started) * 1000)
+            if verbose:
+                ts = _dt.datetime.now().isoformat(timespec="seconds")
+                print(f"[{ts}] ERROR retry failed after {elapsed_ms}ms: {exc}", file=sys.stderr)
+            raise SystemExit(3) from exc
+        elapsed_ms = int((time.time() - started) * 1000)
+        if verbose:
+            ts = _dt.datetime.now().isoformat(timespec="seconds")
+            print(f"[{ts}] RETRY {method} {response.url} -> {response.status_code} ({elapsed_ms}ms)", file=sys.stderr)
+        if raw:
+            return response.status_code, {"_raw": response.text, "content_type": response.headers.get("content-type")}
+        ct = (response.headers.get("content-type") or "").lower()
+        if "application/json" in ct or response.text.strip().startswith("{"):
+            try:
+                data = response.json()
+            except Exception:
+                return response.status_code, {"_raw": response.text}
+        else:
+            data = {"_raw": response.text, "content_type": response.headers.get("content-type")}
+
+    return response.status_code, data
 
 
 def _load_json_from_args(payload_file: str | None, payload_json: str | None) -> dict[str, Any]:
@@ -686,93 +896,83 @@ def cmd_save_token(args: argparse.Namespace) -> None:
     )
 
 
+
+def cmd_save_credentials(args: argparse.Namespace) -> None:
+    credentials_file = _credentials_file_path(args.credentials_file)
+    login = str(args.login or "").strip()
+    password = str(args.password or "")
+    if not login:
+        raise SystemExit("Login manquant.")
+    if not password:
+        if sys.stdin.isatty():
+            password = getpass.getpass("Mot de passe Thamous: ")
+        else:
+            raise SystemExit("Mot de passe manquant.")
+    _write_json_file(credentials_file, {"login": login, "password": password})
+    print(json.dumps({"ok": True, "credentials_file": credentials_file, "login": login}, ensure_ascii=False, indent=2))
+
+
+def cmd_login(args: argparse.Namespace) -> None:
+    data = _refresh_token_from_credentials(args, save_token=True, prompt_password=True)
+    print(json.dumps({
+        "ok": True,
+        "token_file": _token_file_path(args.token_file),
+        "token_type": data.get("token_type"),
+        "expires_at": data.get("expires_at"),
+        "signature": data.get("signature"),
+        "login": data.get("login"),
+        "nom": data.get("nom"),
+        "projects": data.get("projects"),
+    }, ensure_ascii=False, indent=2))
+
+
 def cmd_token_status(args: argparse.Namespace) -> None:
-    token_file = os.path.expanduser(args.token_file or os.environ.get("THAMOUS_TOKEN_FILE") or DEFAULT_TOKEN_FILE)
-    source = None
-    token = None
-    if os.environ.get("THAMOUS_TOKEN"):
-        token = os.environ["THAMOUS_TOKEN"].strip()
-        source = "env:THAMOUS_TOKEN"
-    elif os.path.exists(token_file):
-        token = _read_text_file(token_file).strip()
-        source = token_file
-    else:
-        print(
-            json.dumps(
-                {
-                    "ok": False,
-                    "status": "missing",
-                    "message": "Aucun token local trouvé.",
-                    "expected_token_file": token_file,
-                    "help": _token_help_message(),
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
-        )
-        raise SystemExit(1)
+    token_file = _token_file_path(args.token_file)
+    source_info = _read_token_from_sources(args)
+    source = source_info[1] if source_info else token_file
 
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "X-Authorization": f"Bearer {token}",
-        "X-Thamous-Token": token,
-    }
     try:
-        response = requests.get(
-            args.base_url,
-            params={"path": "logic_context", "projet": args.projet, "token": token},
-            headers=headers,
-            timeout=args.timeout,
+        code, data = _request(
+            base_url=args.base_url,
+            path="logic_context",
+            method="GET",
+            auth=True,
+            timeout_s=args.timeout,
+            verbose=args.verbose,
+            raw=False,
+            response_format="json",
+            params={"projet": args.projet},
+            args=args,
         )
-        data = response.json()
-    except Exception as exc:
-        print(
-            json.dumps(
-                {
-                    "ok": False,
-                    "status": "error",
-                    "source": source,
-                    "message": str(exc),
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
-        )
+    except SystemExit as exc:
+        print(json.dumps({
+            "ok": False,
+            "status": "error",
+            "source": source,
+            "message": str(exc),
+            "help": _token_help_message(),
+        }, ensure_ascii=False, indent=2))
+        raise
+
+    err = _auth_error(data)
+    if err:
+        print(json.dumps({
+            "ok": False,
+            "status": "expired_or_invalid" if _is_invalid_token_error(data) else "error",
+            "source": source,
+            "error": data.get("error"),
+            "help": _token_help_message() if _is_invalid_token_error(data) else "",
+        }, ensure_ascii=False, indent=2))
         raise SystemExit(1)
 
-    if isinstance(data, dict) and isinstance(data.get("error"), dict):
-        err = data["error"]
-        code = str(err.get("code") or "")
-        message = str(err.get("message") or "")
-        expired = code == "UNAUTHORIZED" and message in {"Invalid token", "Missing token"}
-        print(
-            json.dumps(
-                {
-                    "ok": False,
-                    "status": "expired_or_invalid" if expired else "error",
-                    "source": source,
-                    "error": err,
-                    "help": _token_help_message() if expired else "",
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
-        )
-        raise SystemExit(1)
-
-    print(
-        json.dumps(
-            {
-                "ok": True,
-                "status": "valid",
-                "source": source,
-                "signature": data.get("signature"),
-                "projects": data.get("projects"),
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-    )
+    print(json.dumps({
+        "ok": True,
+        "status": "valid",
+        "source": source,
+        "signature": data.get("signature"),
+        "projects": data.get("projects"),
+        "code": code,
+    }, ensure_ascii=False, indent=2))
 
 
 def _open_url(url: str) -> None:
@@ -803,6 +1003,7 @@ def cmd_fiche_url(args: argparse.Namespace) -> None:
         raw=args.raw,
         response_format=args.response_format,
         params={"id": args.id, "table": args.table, **({"projet": args.projet} if args.projet else {})},
+        args=args,
     )
     if args.response_format == "url" and isinstance(data, dict) and data.get("_raw"):
         print(str(data.get("_raw", "")).strip())
@@ -821,6 +1022,7 @@ def cmd_open_fiche(args: argparse.Namespace) -> None:
         raw=False,
         response_format="url",
         params={"id": args.id, "table": args.table, **({"projet": args.projet} if args.projet else {})},
+        args=args,
     )
     url = ""
     if isinstance(data, dict):
@@ -852,6 +1054,7 @@ def cmd_open_list(args: argparse.Namespace) -> None:
         raw=False,
         response_format="url",
         payload=_base_payload_from_args(args),
+        args=args,
     )
     url = ""
     if isinstance(data, dict) and data.get("_raw"):
@@ -885,6 +1088,7 @@ def cmd_project_keywords(args: argparse.Namespace) -> None:
         raw=args.raw,
         response_format=args.response_format,
         params=params,
+        args=args,
     )
     _emit_output(code, data, args.format)
 
@@ -906,6 +1110,7 @@ def cmd_refs_by_keyword(args: argparse.Namespace) -> None:
         raw=args.raw,
         response_format=args.response_format,
         params=params,
+        args=args,
     )
     _emit_output(code, data, args.format)
 
@@ -919,9 +1124,12 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--timeout", type=int, default=45, help="Timeout HTTP en secondes.")
     ap.add_argument(
         "--token-file",
-        default=os.environ.get("THAMOUS_TOKEN_FILE"),
-        help="Chemin d’un fichier contenant le token (ou THAMOUS_TOKEN_FILE).",
+        default=os.environ.get("THAMOUS_TOKEN_FILE") or os.environ.get("THAMOUS_API_TOKEN_FILE"),
+        help="Chemin d’un fichier contenant le token (ou THAMOUS_TOKEN_FILE / THAMOUS_API_TOKEN_FILE).",
     )
+    ap.add_argument("--credentials-file", default=os.environ.get("THAMOUS_CREDENTIALS_FILE", DEFAULT_CREDENTIALS_FILE), help="Chemin du fichier d’identifiants Thamous.")
+    ap.add_argument("--login", default=os.environ.get("THAMOUS_LOGIN", ""), help="Login Thamous.")
+    ap.add_argument("--password", default=os.environ.get("THAMOUS_PASSWORD", ""), help="Mot de passe Thamous.")
     ap.add_argument(
         "--history-file",
         default=os.environ.get("THAMOUS_HISTORY_FILE", DEFAULT_HISTORY_FILE),
@@ -974,6 +1182,17 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("save-token")
     sp.add_argument("--token", required=True)
     sp.add_argument("--token-file", default=DEFAULT_TOKEN_FILE)
+
+    sp = sub.add_parser("save-credentials")
+    sp.add_argument("--login", required=True)
+    sp.add_argument("--password")
+    sp.add_argument("--credentials-file", default=DEFAULT_CREDENTIALS_FILE)
+
+    sp = sub.add_parser("login")
+    sp.add_argument("--login")
+    sp.add_argument("--password")
+    sp.add_argument("--token-file", default=DEFAULT_TOKEN_FILE)
+    sp.add_argument("--credentials-file", default=DEFAULT_CREDENTIALS_FILE)
 
     sp = sub.add_parser("token-status")
     sp.add_argument("--projet", default="perso")
@@ -1056,6 +1275,12 @@ def main() -> None:
 
     if args.action == "save-token":
         cmd_save_token(args)
+        return
+    elif args.action == "save-credentials":
+        cmd_save_credentials(args)
+        return
+    elif args.action == "login":
+        cmd_login(args)
         return
     elif args.action == "token-status":
         cmd_token_status(args)

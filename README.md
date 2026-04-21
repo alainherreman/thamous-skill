@@ -11,12 +11,12 @@ Contenu :
 Utilisation réelle :
 - nécessite un **token Thamous** ;
 - nécessite aussi une **clé API fournisseur LLM** ;
-- le token Thamous se récupère simplement depuis une session web Thamous connectée via `https://thamous.ouvaton.org/thamous/php/ajax_get_api_token.php`, puis s’enregistre localement avec :
+- la solution la plus simple est d’utiliser le **même token partagé stable** que vos autres clients Thamous, puis de l’enregistrer localement avec :
   - `python3 scripts/thamous_api_v2.py save-token --token VOTRE_TOKEN`
 - il est alors stocké par défaut dans `~/.config/thamous/token`, relu automatiquement par les commandes normales ;
 - son état se vérifie avec :
   - `python3 scripts/thamous_api_v2.py token-status`
-- si `token-status` indique `expired_or_invalid`, il faut juste régénérer un nouveau token par la même procédure ;
+- si `token-status` indique `expired_or_invalid`, il faut d’abord vérifier que la skill utilise bien le **bon token partagé** ;
 - l’API v2 accepte à nouveau correctement le header `Authorization: Bearer ...` côté serveur ;
 - la clé fournisseur s'enregistre dans le menu `LLM`, où l'on choisit aussi le modèle.
 
@@ -91,3 +91,21 @@ Exemple :
 - ce problème concerne surtout l'ouverture d'une liste Thamous ou toute demande dont le résultat doit être une vraie table Thamous (`trevues`, `tpersonnes`)
 - dans ce cas, il faut résoudre les chaînes de `tbiblio.editeur` vers `trevues`, ou celles de `tbiblio.nom` vers `tpersonnes`
 - en revanche, pour une réponse JSON, on peut retourner directement les chaînes de `tbiblio.editeur` ou `tbiblio.nom` si c'est bien cela que demande l'utilisateur
+
+## Authentification utilisateur
+
+L’utilisateur n’a pas à manipuler directement un token.
+
+Procédure simple :
+
+```bash
+~/.codex/skills/thamous-api-v2/bin/thamous-v2 save-credentials --login VOTRE_LOGIN
+~/.codex/skills/thamous-api-v2/bin/thamous-v2 token-status
+```
+
+Le client :
+- récupère automatiquement un token via `login_token` ;
+- le stocke localement ;
+- le renouvelle automatiquement s’il expire.
+
+En secours, on peut toujours fournir `--login` et `--password` à la commande, ou utiliser un token déjà présent.
