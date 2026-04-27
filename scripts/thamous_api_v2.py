@@ -845,6 +845,44 @@ def _base_payload_from_args(args: argparse.Namespace) -> dict[str, Any]:
     return payload
 
 
+def _extract_url_or_exit(code: int, data: Any, fmt: str, *, context: str) -> str:
+    """Return a valid http(s) URL from an API response, or fail clearly.
+
+    Some upstream failures (notably gateway 504 pages) can arrive as raw HTML.
+    They must not be treated as URLs or rewrapped as {"url": "<html>..."}.
+    """
+    url = ""
+    if isinstance(data, dict):
+        if data.get("form_url"):
+            url = str(data["form_url"]).strip()
+        elif data.get("_raw"):
+            url = str(data["_raw"]).strip()
+    elif isinstance(data, str):
+        url = data.strip()
+
+    if not url:
+        _emit_output(code, data, fmt)
+        raise SystemExit(1 if code >= 400 else 0)
+
+    if not re.match(r"^https?://", url, flags=re.IGNORECASE):
+        raw = url
+        lower = raw.lower()
+        err_code = "UPSTREAM_INVALID_URL"
+        message = f"La réponse de l’API ne contient pas d’URL ouvrable pour {context}."
+        if "504 gateway" in lower or "gateway time-out" in lower or "gateway timeout" in lower:
+            err_code = "UPSTREAM_TIMEOUT"
+            message = f"Le serveur Thamous n’a pas répondu à temps pendant {context}."
+        _emit_output(502, {
+            "error": {
+                "code": err_code,
+                "message": message,
+                "details": raw[:500],
+            }
+        }, fmt)
+        raise SystemExit(1)
+
+    return url
+
 def _emit_output(code: int, data: Any, fmt: str) -> None:
     if fmt == "json":
         print(json.dumps(data, ensure_ascii=False, indent=2))
@@ -1024,15 +1062,7 @@ def cmd_open_fiche(args: argparse.Namespace) -> None:
         params={"id": args.id, "table": args.table, **({"projet": args.projet} if args.projet else {})},
         args=args,
     )
-    url = ""
-    if isinstance(data, dict):
-        if data.get("form_url"):
-            url = str(data["form_url"]).strip()
-        elif data.get("_raw"):
-            url = str(data["_raw"]).strip()
-    if not url:
-        _emit_output(code, data, args.format)
-        return
+    url = _extract_url_or_exit(code, data, args.format, context="l’ouverture de la fiche")
     if args.print_only:
         print(url)
         return
@@ -1056,14 +1086,7 @@ def cmd_open_list(args: argparse.Namespace) -> None:
         payload=_base_payload_from_args(args),
         args=args,
     )
-    url = ""
-    if isinstance(data, dict) and data.get("_raw"):
-        url = str(data["_raw"]).strip()
-    elif isinstance(data, str):
-        url = data.strip()
-    if not url:
-        _emit_output(code, data, args.format)
-        return
+    url = _extract_url_or_exit(code, data, args.format, context="la génération de la liste")
     if args.print_only:
         print(url)
         return
