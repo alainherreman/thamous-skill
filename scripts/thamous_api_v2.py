@@ -1097,6 +1097,117 @@ def cmd_open_list(args: argparse.Namespace) -> None:
         print(url)
 
 
+def cmd_project_keyword(args: argparse.Namespace) -> None:
+    payload = {
+        'project': args.project,
+        'mot_clef': args.mot_clef,
+        'definition': args.definition or '',
+        'action': args.keyword_action,
+        'force': args.force,
+    }
+    code, data = _request(
+        base_url=args.base_url,
+        path='keywords_project',
+        method='POST',
+        auth=True,
+        timeout_s=args.timeout,
+        verbose=args.verbose,
+        raw=args.raw,
+        response_format=args.response_format,
+        payload=payload,
+        args=args,
+    )
+    _emit_output(code, data, args.format)
+
+def cmd_keyword_ref(args: argparse.Namespace) -> None:
+    payload = {
+        'project': args.project,
+        'table': args.table,
+        'id': args.id,
+        'mots_clefs': args.mot_clef,
+        'action': args.keyword_action,
+        'publicite': args.publicite,
+    }
+    code, data = _request(
+        base_url=args.base_url,
+        path='keywords_ref',
+        method='POST',
+        auth=True,
+        timeout_s=args.timeout,
+        verbose=args.verbose,
+        raw=args.raw,
+        response_format=args.response_format,
+        payload=payload,
+        args=args,
+    )
+    _emit_output(code, data, args.format)
+
+def cmd_create_ref(args: argparse.Namespace) -> None:
+    fields: dict[str, Any] = {}
+    for item in args.field or []:
+        if '=' not in item:
+            raise SystemExit(f"Champ invalide (attendu champ=valeur): {item}")
+        key, value = item.split('=', 1)
+        key = key.strip()
+        if not key:
+            raise SystemExit(f"Champ invalide (nom vide): {item}")
+        fields[key] = value.strip()
+    keywords = args.mot_clef or []
+    payload = {
+        'project': args.project,
+        'table': args.table,
+        'fields': fields,
+        'mots_clefs': keywords,
+        'publicite': args.publicite,
+        'dedupe': not args.no_dedupe,
+    }
+    code, data = _request(
+        base_url=args.base_url,
+        path='create_ref',
+        method='POST',
+        auth=True,
+        timeout_s=args.timeout,
+        verbose=args.verbose,
+        raw=args.raw,
+        response_format=args.response_format,
+        payload=payload,
+        args=args,
+    )
+    _emit_output(code, data, args.format)
+
+
+def cmd_create_link(args: argparse.Namespace) -> None:
+    payload: dict[str, Any] = {
+        'project': args.project,
+        'type_lien': args.type_lien,
+        'table_source': args.table_source,
+        'id_source': args.id_source,
+        'table_but': args.table_but,
+        'id_but': args.id_but,
+        'dedupe': not args.no_dedupe,
+    }
+    for item in args.field or []:
+        if '=' not in item:
+            raise SystemExit(f"Champ invalide (attendu champ=valeur): {item}")
+        key, value = item.split('=', 1)
+        key = key.strip()
+        if not key:
+            raise SystemExit(f"Champ invalide (nom vide): {item}")
+        payload[key] = value.strip()
+    code, data = _request(
+        base_url=args.base_url,
+        path='create_link',
+        method='POST',
+        auth=True,
+        timeout_s=args.timeout,
+        verbose=args.verbose,
+        raw=args.raw,
+        response_format=args.response_format,
+        payload=payload,
+        args=args,
+    )
+    _emit_output(code, data, args.format)
+
 def cmd_project_keywords(args: argparse.Namespace) -> None:
     params = {}
     if args.project:
@@ -1221,6 +1332,39 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--projet", default="perso")
     sp.add_argument("--token-file", default=DEFAULT_TOKEN_FILE)
 
+    sp = sub.add_parser("project-keyword")
+    sp.add_argument("--project", required=True)
+    sp.add_argument("--mot-clef", dest="mot_clef", required=True)
+    sp.add_argument("--definition", default="")
+    sp.add_argument("--action", dest="keyword_action", choices=["add", "remove"], default="add")
+    sp.add_argument("--force", action="store_true")
+
+    sp = sub.add_parser("keyword-ref")
+    sp.add_argument("--project", required=True)
+    sp.add_argument("--table", default="tbiblio")
+    sp.add_argument("--id", required=True, type=int)
+    sp.add_argument("--mot-clef", dest="mot_clef", action="append", required=True, help="Mot-clef à attribuer/retirer. Répéter l’option ou séparer par virgules/points-virgules.")
+    sp.add_argument("--action", dest="keyword_action", choices=["add", "remove"], default="add")
+    sp.add_argument("--publicite", default="")
+
+    sp = sub.add_parser("create-ref")
+    sp.add_argument("--project", required=True)
+    sp.add_argument("--table", default="tbiblio")
+    sp.add_argument("--field", action="append", default=[], help="Champ à créer, forme champ=valeur. Répéter l’option.")
+    sp.add_argument("--mot-clef", dest="mot_clef", action="append", default=[], help="Mot-clef à attribuer. Répéter l’option.")
+    sp.add_argument("--publicite", default="public")
+    sp.add_argument("--no-dedupe", action="store_true")
+
+    sp = sub.add_parser("create-link")
+    sp.add_argument("--project", required=True)
+    sp.add_argument("--type-lien", dest="type_lien", required=True)
+    sp.add_argument("--table-source", required=True)
+    sp.add_argument("--id-source", type=int, required=True)
+    sp.add_argument("--table-but", required=True)
+    sp.add_argument("--id-but", type=int, required=True)
+    sp.add_argument("--field", action="append", default=[], help="Champ optionnel du lien, forme champ=valeur. Répéter l’option.")
+    sp.add_argument("--no-dedupe", action="store_true")
+
     sp = sub.add_parser("project-keywords")
     sp.add_argument("--project")
 
@@ -1310,6 +1454,18 @@ def main() -> None:
         return
     elif args.action == "history":
         cmd_history(args)
+        return
+    elif args.action == "project-keyword":
+        cmd_project_keyword(args)
+        return
+    elif args.action == "keyword-ref":
+        cmd_keyword_ref(args)
+        return
+    elif args.action == "create-ref":
+        cmd_create_ref(args)
+        return
+    elif args.action == "create-link":
+        cmd_create_link(args)
         return
     elif args.action == "project-keywords":
         cmd_project_keywords(args)

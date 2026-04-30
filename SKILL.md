@@ -51,6 +51,8 @@ Actions actuellement prises en charge :
   - à partir d’une liste locale existante.
 - **modifier les mots-clefs et remarques**
   - sur une référence ;
+  - plusieurs mots-clefs peuvent être ajoutés en une seule opération sur une même référence ;
+  - l’ajout de mots-clefs est idempotent : ne jamais retirer un mot-clef déjà présent, et ne pas créer de doublon ;
   - sans `publicite`, l’ajout d’un mot-clef se fait par défaut en `privé`, et une suppression retire toutes les occurrences du projet ;
   - sur la liste de projet ;
   - avec avertissement si le mot-clef ou la remarque est encore utilisé sur des références, puis possibilité de forcer la suppression.
@@ -175,31 +177,47 @@ Règle :
 
 ## Chemin du client
 
-Commande canonique à utiliser après installation de la skill, selon l’OS :
+Commande canonique locale sur cet ordinateur :
 
-- Linux / macOS :
-  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 ...`
-- Windows `cmd.exe` :
-  - `%USERPROFILE%\\.codex\\skills\\thamous-api-v2\\bin\\thamous-v2.cmd ...`
-- Windows PowerShell :
-  - `& "$HOME/.codex/skills/thamous-api-v2/bin/thamous-v2.ps1" ...`
+- `thamous-v2 ...`
 
-Dans le dépôt de développement de la skill :
+Ce wrapper est installé dans :
 
-- Linux / macOS : `./bin/thamous-v2 ...`
-- Windows `cmd.exe` : `bin\\thamous-v2.cmd ...`
-- Windows PowerShell : `& ".\\bin\\thamous-v2.ps1" ...`
+- `/home/alain/.local/bin/thamous-v2`
+
+Il pointe explicitement vers le client de cette skill :
+
+- `/media/alain/ssd2/Dropbox/programmation/skills/thamous-skill/scripts/thamous_api_v2.py`
+
+Conséquence : la skill doit pouvoir être utilisée avec Codex lancé depuis **n’importe quel répertoire** de cet ordinateur, sans dépendre du `cwd`.
+
+Chemins de secours, à n’utiliser que si le wrapper global est indisponible :
+
+- `~/.codex/skills/thamous-api-v2/bin/thamous-v2 ...`
+- `/media/alain/ssd2/Dropbox/programmation/skills/thamous-skill/bin/thamous-v2 ...`
 
 Script sous-jacent, à n’utiliser qu’en secours ou pour maintenance explicite :
 
-- `python3 ~/.codex/skills/thamous-api-v2/scripts/thamous_api_v2.py ...`
+- `python3 /media/alain/ssd2/Dropbox/programmation/skills/thamous-skill/scripts/thamous_api_v2.py ...`
+
+
+### Usage dans Codex sur cet ordinateur
+
+Pour éviter toute validation inutile dans Codex, utiliser en priorité la commande absolue déjà autorisée :
+
+- `python3 /media/alain/ssd2/Dropbox/programmation/skills/thamous-skill/scripts/thamous_api_v2.py ...`
+
+Cette commande fonctionne quel que soit le répertoire courant.
+
+Le wrapper global `thamous-v2` existe pour le terminal et les usages humains ; dans Codex, si le sandbox réclame une validation pour `thamous-v2`, revenir immédiatement à la commande absolue ci-dessus au lieu de demander une validation.
 
 ## Verrou structurel contre les variantes
 
 Pour cette skill, il faut aligner la règle métier et la mécanique technique :
 
 1. **une famille de commandes canonique**
-   - utiliser le wrapper canonique du système (`bin/thamous-v2`, `bin\\thamous-v2.cmd` ou `bin/thamous-v2.ps1`) ;
+   - dans Codex sur cet ordinateur, utiliser la commande absolue `python3 /media/alain/ssd2/Dropbox/programmation/skills/thamous-skill/scripts/thamous_api_v2.py ...` pour éviter les validations ;
+   - dans un terminal humain, utiliser le wrapper global `thamous-v2` ;
    - ne pas improviser de `curl`, de `python -c`, ni de variante shell si le wrapper couvre le besoin ;
 2. **des sous-commandes canoniques**
    - utiliser les sous-commandes réellement exposées par le client (`health`, `save-token`, `save-credentials`, `login`, `token-status`, `logic-context`, `fiche-url`, `open-fiche`, `open-list`, `text-to-structure`, `ask-logic`, `compile-logic`, `search-logic`, `replay-logic`) ;
@@ -209,7 +227,7 @@ Pour cette skill, il faut aligner la règle métier et la mécanique technique :
    - si une ouverture navigateur n’est pas explicitement demandée, préférer une commande qui renvoie l’URL ou le JSON plutôt qu’une ouverture locale ;
    - si un doute d’exécution apparaît, préférer la forme canonique la plus simple déjà prévue par la skill.
 
-Conséquence pratique : le wrapper canonique du système est l’entrée normale ; le script Python direct est une implémentation interne.
+Conséquence pratique : dans Codex, la commande absolue Python ci-dessus est l’entrée normale sans validation ; dans un terminal humain, `thamous-v2` est l’entrée normale.
 
 ## Pré-requis
 
@@ -223,9 +241,9 @@ Conséquence pratique : le wrapper canonique du système est l’entrée normale
 
 - **Compte Thamous** :
   - l’utilisateur enregistre une fois ses identifiants :
-    - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 save-credentials --login VOTRE_LOGIN`
+    - `thamous-v2 save-credentials --login VOTRE_LOGIN`
   - puis vérifie avec :
-    - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 token-status`
+    - `thamous-v2 token-status`
   - le client récupère automatiquement un token via `login_token`, le stocke localement et le renouvelle automatiquement si nécessaire.
 - **Clé API fournisseur** : dans Thamous, ouvrir le menu `LLM`, enregistrer une clé API pour le fournisseur voulu, puis choisir un modèle. Cette clé reste enregistrée dans Thamous pour le compte utilisateur.
 
@@ -273,35 +291,35 @@ Les exemples complets et les tests représentatifs sont rassemblés dans `refere
 Rappel rapide des usages essentiels :
 
 - Première configuration :
-  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 save-credentials --login VOTRE_LOGIN`
-  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 token-status`
+  - `thamous-v2 save-credentials --login VOTRE_LOGIN`
+  - `thamous-v2 token-status`
 
 - Santé :
-  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 health`
+  - `thamous-v2 health`
 
 - Contexte logique :
-  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 logic-context --projet HilbertGG`
+  - `thamous-v2 logic-context --projet HilbertGG`
 
 - Voir l'historique local :
-  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 --format table history`
+  - `thamous-v2 --format table history`
 
 - Ouvrir une fiche :
-  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 open-fiche --table tbiblio --id 1442`
+  - `thamous-v2 open-fiche --table tbiblio --id 1442`
 
 - Ouvrir une liste :
-  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 open-list --q "Les livres de Klein traduits en anglais" --project perso --provider xAI --model "Grok 4"`
+  - `thamous-v2 open-list --q "Les livres de Klein traduits en anglais" --project perso --provider xAI --model "Grok 4"`
 
 - Obtenir une structure logique :
-  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 text-to-structure --q "Les articles en espagnol sur Hilbert" --project HilbertGG --provider xAI --model "Grok 4"`
+  - `thamous-v2 text-to-structure --q "Les articles en espagnol sur Hilbert" --project HilbertGG --provider xAI --model "Grok 4"`
 
 - Recherche logique avec stockage local :
-  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 ask-logic --q "Les livres de Klein traduits en anglais" --project HilbertGG --provider xAI --model "Grok 4" --result-name klein_traduits`
+  - `thamous-v2 ask-logic --q "Les livres de Klein traduits en anglais" --project HilbertGG --provider xAI --model "Grok 4" --result-name klein_traduits`
 
 - Ajouter à la liste précédente :
-  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 add-to-list --previous --q "les éditions françaises" --project HilbertGG --provider xAI --model "Grok 4"`
+  - `thamous-v2 add-to-list --previous --q "les éditions françaises" --project HilbertGG --provider xAI --model "Grok 4"`
 
 - Suivre un lien depuis la liste précédente :
-  - `~/.codex/skills/thamous-api-v2/bin/thamous-v2 follow-links --previous --link-type Cite --from source --to but --output-table tbiblio --project HilbertGG`
+  - `thamous-v2 follow-links --previous --link-type Cite --from source --to but --output-table tbiblio --project HilbertGG`
 
 ## Règle de robustesse
 
@@ -311,7 +329,7 @@ Rappel rapide des usages essentiels :
 
 ## Règles d’usage
 
-- Utiliser le wrapper canonique du système ; éviter les variantes ad hoc tant qu’il couvre le besoin.
+- Utiliser le wrapper canonique global `thamous-v2` ; éviter les variantes ad hoc tant qu’il couvre le besoin.
 - Préférer `ask-logic` pour une recherche complète.
 - Les réponses de recherche sont limitées à **100 résultats** côté API ; la skill ne doit pas essayer de modifier cette limite.
 - Préférer `open-fiche` et `open-list` quand l’utilisateur demande explicitement une ouverture.
