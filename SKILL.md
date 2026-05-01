@@ -49,6 +49,10 @@ Actions actuellement prises en charge :
   - à partir d’une nouvelle demande.
 - **suivre un type de lien**
   - à partir d’une liste locale existante.
+- **créer et supprimer des liens**
+  - créer un lien entre une source et un but ;
+  - supprimer un lien seulement si l’API confirme les conditions de sécurité ;
+  - quand la suppression est refusée, rapporter les raisons renvoyées par l’API.
 - **modifier les mots-clefs et remarques**
   - sur une référence ;
   - plusieurs mots-clefs peuvent être ajoutés en une seule opération sur une même référence ;

@@ -1208,6 +1208,34 @@ def cmd_create_link(args: argparse.Namespace) -> None:
     )
     _emit_output(code, data, args.format)
 
+def cmd_delete_link(args: argparse.Namespace) -> None:
+    payload: dict[str, Any] = {
+        'project': args.project,
+    }
+    if args.id:
+        payload['id'] = args.id
+    else:
+        payload.update({
+            'type_lien': args.type_lien,
+            'table_source': args.table_source,
+            'id_source': args.id_source,
+            'table_but': args.table_but,
+            'id_but': args.id_but,
+        })
+    code, data = _request(
+        base_url=args.base_url,
+        path='delete_link',
+        method='POST',
+        auth=True,
+        timeout_s=args.timeout,
+        verbose=args.verbose,
+        raw=args.raw,
+        response_format=args.response_format,
+        payload=payload,
+        args=args,
+    )
+    _emit_output(code, data, args.format)
+
 def cmd_project_keywords(args: argparse.Namespace) -> None:
     params = {}
     if args.project:
@@ -1365,6 +1393,15 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--field", action="append", default=[], help="Champ optionnel du lien, forme champ=valeur. Répéter l’option.")
     sp.add_argument("--no-dedupe", action="store_true")
 
+    sp = sub.add_parser("delete-link")
+    sp.add_argument("--project", required=True)
+    sp.add_argument("--id", type=int, default=0, help="Identifiant du lien à supprimer. Si absent, fournir le type, la source et le but.")
+    sp.add_argument("--type-lien", dest="type_lien", default="")
+    sp.add_argument("--table-source", default="")
+    sp.add_argument("--id-source", type=int, default=0)
+    sp.add_argument("--table-but", default="")
+    sp.add_argument("--id-but", type=int, default=0)
+
     sp = sub.add_parser("project-keywords")
     sp.add_argument("--project")
 
@@ -1466,6 +1503,9 @@ def main() -> None:
         return
     elif args.action == "create-link":
         cmd_create_link(args)
+        return
+    elif args.action == "delete-link":
+        cmd_delete_link(args)
         return
     elif args.action == "project-keywords":
         cmd_project_keywords(args)
