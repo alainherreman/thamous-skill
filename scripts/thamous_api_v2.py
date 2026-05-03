@@ -1374,6 +1374,38 @@ def cmd_graph_update(args: argparse.Namespace) -> None:
     _emit_output(code, data_resp, args.format)
 
 
+
+def cmd_graph_add_items(args: argparse.Namespace) -> None:
+    code, data = _request(
+        base_url=args.base_url,
+        path="graph_add_items",
+        method="POST",
+        auth=True,
+        timeout_s=args.timeout,
+        verbose=args.verbose,
+        raw=args.raw,
+        response_format=args.response_format,
+        payload={"id": args.id, "items": _items_from_args(args.item)},
+        args=args,
+    )
+    _emit_output(code, data, args.format)
+
+
+def cmd_graph_remove_items(args: argparse.Namespace) -> None:
+    code, data = _request(
+        base_url=args.base_url,
+        path="graph_remove_items",
+        method="POST",
+        auth=True,
+        timeout_s=args.timeout,
+        verbose=args.verbose,
+        raw=args.raw,
+        response_format=args.response_format,
+        payload={"id": args.id, "items": _items_from_args(args.item)},
+        args=args,
+    )
+    _emit_output(code, data, args.format)
+
 def cmd_graph_delete(args: argparse.Namespace) -> None:
     code, data = _request(
         base_url=args.base_url,
@@ -1585,6 +1617,14 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("graph-delete")
     sp.add_argument("--id", type=int, required=True)
 
+    sp = sub.add_parser("graph-add-items")
+    sp.add_argument("--id", type=int, required=True)
+    sp.add_argument("--item", action="append", required=True, help="Élément Thamous à ajouter, forme table:id. Répéter l’option.")
+
+    sp = sub.add_parser("graph-remove-items")
+    sp.add_argument("--id", type=int, required=True)
+    sp.add_argument("--item", action="append", required=True, help="Élément Thamous à retirer, forme table:id. Répéter l’option.")
+
     sp = sub.add_parser("project-keywords")
     sp.add_argument("--project")
 
@@ -1707,6 +1747,12 @@ def main() -> None:
         return
     elif args.action == "graph-delete":
         cmd_graph_delete(args)
+        return
+    elif args.action == "graph-add-items":
+        cmd_graph_add_items(args)
+        return
+    elif args.action == "graph-remove-items":
+        cmd_graph_remove_items(args)
         return
     elif args.action == "project-keywords":
         cmd_project_keywords(args)
