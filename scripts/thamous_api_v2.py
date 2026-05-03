@@ -1236,6 +1236,159 @@ def cmd_delete_link(args: argparse.Namespace) -> None:
     )
     _emit_output(code, data, args.format)
 
+
+def _json_file_arg(path: str | None) -> Any:
+    if not path:
+        return None
+    with open(path, "r", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def _items_from_args(items: list[str] | None) -> list[dict[str, int | str]]:
+    out: list[dict[str, int | str]] = []
+    for item in items or []:
+        if ":" not in item:
+            raise SystemExit(f"Item invalide (attendu table:id): {item}")
+        table, raw_id = item.split(":", 1)
+        table = table.strip()
+        try:
+            item_id = int(raw_id.strip())
+        except ValueError as exc:
+            raise SystemExit(f"Item invalide (id numérique attendu): {item}") from exc
+        out.append({"table": table, "id": item_id})
+    return out
+
+
+def cmd_graphs_list(args: argparse.Namespace) -> None:
+    params = {}
+    if args.project:
+        params["project"] = args.project
+    code, data = _request(
+        base_url=args.base_url,
+        path="graphs_list",
+        method="GET",
+        auth=True,
+        timeout_s=args.timeout,
+        verbose=args.verbose,
+        raw=args.raw,
+        response_format=args.response_format,
+        params=params,
+        args=args,
+    )
+    _emit_output(code, data, args.format)
+
+
+def cmd_graph_get(args: argparse.Namespace) -> None:
+    code, data = _request(
+        base_url=args.base_url,
+        path="graph_get",
+        method="GET",
+        auth=True,
+        timeout_s=args.timeout,
+        verbose=args.verbose,
+        raw=args.raw,
+        response_format=args.response_format,
+        params={"id": args.id, "include_data": int(args.include_data), "include_items": int(args.include_items)},
+        args=args,
+    )
+    _emit_output(code, data, args.format)
+
+
+def cmd_graph_open(args: argparse.Namespace) -> None:
+    code, data = _request(
+        base_url=args.base_url,
+        path="graph_open_url",
+        method="GET",
+        auth=True,
+        timeout_s=args.timeout,
+        verbose=args.verbose,
+        raw=False,
+        response_format="url",
+        params={"id": args.id},
+        args=args,
+    )
+    url = _extract_url_or_exit(code, data, args.format, context="l’ouverture du graphe")
+    if args.print_only:
+        print(url)
+        return
+    _open_url(url)
+    if args.format == "json":
+        print(json.dumps({"url": url}, ensure_ascii=False, indent=2))
+    else:
+        print(url)
+
+
+def cmd_graph_create(args: argparse.Namespace) -> None:
+    payload: dict[str, Any] = {
+        "project": args.project,
+        "titre": args.titre,
+    }
+    if args.publicite:
+        payload["publicite"] = args.publicite
+    data = _json_file_arg(args.data_file)
+    if data is not None:
+        payload["data"] = data
+    items = _items_from_args(args.item)
+    if items:
+        payload["items"] = items
+    code, data_resp = _request(
+        base_url=args.base_url,
+        path="graph_create",
+        method="POST",
+        auth=True,
+        timeout_s=args.timeout,
+        verbose=args.verbose,
+        raw=args.raw,
+        response_format=args.response_format,
+        payload=payload,
+        args=args,
+    )
+    _emit_output(code, data_resp, args.format)
+
+
+def cmd_graph_update(args: argparse.Namespace) -> None:
+    payload: dict[str, Any] = {"id": args.id}
+    if args.titre:
+        payload["titre"] = args.titre
+    if args.project:
+        payload["project"] = args.project
+    if args.publicite:
+        payload["publicite"] = args.publicite
+    data = _json_file_arg(args.data_file)
+    if data is not None:
+        payload["data"] = data
+    if args.item is not None:
+        payload["items"] = _items_from_args(args.item)
+    code, data_resp = _request(
+        base_url=args.base_url,
+        path="graph_update",
+        method="POST",
+        auth=True,
+        timeout_s=args.timeout,
+        verbose=args.verbose,
+        raw=args.raw,
+        response_format=args.response_format,
+        payload=payload,
+        args=args,
+    )
+    _emit_output(code, data_resp, args.format)
+
+
+def cmd_graph_delete(args: argparse.Namespace) -> None:
+    code, data = _request(
+        base_url=args.base_url,
+        path="graph_delete",
+        method="POST",
+        auth=True,
+        timeout_s=args.timeout,
+        verbose=args.verbose,
+        raw=args.raw,
+        response_format=args.response_format,
+        payload={"id": args.id},
+        args=args,
+    )
+    _emit_output(code, data, args.format)
+
 def cmd_project_keywords(args: argparse.Namespace) -> None:
     params = {}
     if args.project:
@@ -1402,6 +1555,36 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--table-but", default="")
     sp.add_argument("--id-but", type=int, default=0)
 
+    sp = sub.add_parser("graphs-list")
+    sp.add_argument("--project")
+
+    sp = sub.add_parser("graph-get")
+    sp.add_argument("--id", type=int, required=True)
+    sp.add_argument("--include-data", action="store_true")
+    sp.add_argument("--include-items", action="store_true", default=True)
+
+    sp = sub.add_parser("graph-open")
+    sp.add_argument("--id", type=int, required=True)
+    sp.add_argument("--print-only", action="store_true", help="Retourner l'URL sans lancer le navigateur.")
+
+    sp = sub.add_parser("graph-create")
+    sp.add_argument("--project", required=True)
+    sp.add_argument("--titre", required=True)
+    sp.add_argument("--publicite", default="")
+    sp.add_argument("--data-file", default="", help="Fichier JSON sigma/cytoscape contenant nodes/edges.")
+    sp.add_argument("--item", action="append", default=[], help="Élément Thamous à contenir, forme table:id. Répéter l’option.")
+
+    sp = sub.add_parser("graph-update")
+    sp.add_argument("--id", type=int, required=True)
+    sp.add_argument("--titre", default="")
+    sp.add_argument("--project", default="")
+    sp.add_argument("--publicite", default="")
+    sp.add_argument("--data-file", default="", help="Fichier JSON sigma/cytoscape contenant nodes/edges.")
+    sp.add_argument("--item", action="append", help="Remplace les éléments Thamous contenus, forme table:id. Répéter l’option. Passer aucune option pour ne pas modifier les items.")
+
+    sp = sub.add_parser("graph-delete")
+    sp.add_argument("--id", type=int, required=True)
+
     sp = sub.add_parser("project-keywords")
     sp.add_argument("--project")
 
@@ -1506,6 +1689,24 @@ def main() -> None:
         return
     elif args.action == "delete-link":
         cmd_delete_link(args)
+        return
+    elif args.action == "graphs-list":
+        cmd_graphs_list(args)
+        return
+    elif args.action == "graph-get":
+        cmd_graph_get(args)
+        return
+    elif args.action == "graph-open":
+        cmd_graph_open(args)
+        return
+    elif args.action == "graph-create":
+        cmd_graph_create(args)
+        return
+    elif args.action == "graph-update":
+        cmd_graph_update(args)
+        return
+    elif args.action == "graph-delete":
+        cmd_graph_delete(args)
         return
     elif args.action == "project-keywords":
         cmd_project_keywords(args)
